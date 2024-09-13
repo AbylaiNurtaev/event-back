@@ -104,9 +104,9 @@ export const register = async (req, res) => {
 }
 
 const transporter = nodemailer.createTransport({
-    // host: 'smtp.ethereal.email',
-    // secure: true,
-    // port: 465,
+    host: 'smtp.ethereal.email',
+    secure: true,
+    port: 465,
     service: "gmail",
     auth: {
       user: "weds.astana@gmail.com",
@@ -135,7 +135,13 @@ const sendOTPVerificationEmail = async ({_id, email}) => {
             expiresAt: Date.now() + 3600000
         })
         await newOtpVerification.save()
-        await transporter.sendMail(mailOptions)
+        await transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.log('Error sending email:', error);
+            } else {
+                console.log('Email sent:', info.response);
+            }
+        });
         // res.json({
         //     status: "PENDING",
         //     message: "На вашу почту отправлен код подтверждения",
