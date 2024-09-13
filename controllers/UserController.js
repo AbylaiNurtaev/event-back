@@ -7,6 +7,7 @@ import bcrypt from 'bcrypt'
 import UserOTPVerification from '../models/UserOTPVerification.js';
 
 dotenv.config();
+import crypto from 'crypto';
 import Mailgen from 'mailgen';
 import User from './../models/User.js';
 
@@ -122,10 +123,11 @@ const transporter = nodemailer.createTransport({
     },
   });
 
-  const sendOTPVerificationEmail = async ({_id, email}) => {
+  const sendOTPVerificationEmail = async ({ _id, email }) => {
     try {
-        const otp = `${Math.floor(1000 + Math.random() * 9000)}`; // Генерация случайного OTP
-        console.log(otp); // Вывод для отладки
+        // Генерация случайного OTP
+        const otp = crypto.randomInt(1000, 9999).toString();  // Используем криптографически стойкий генератор случайных чисел
+        console.log(otp);  // Вывод для отладки
 
         // Настройка письма
         const mailOptions = {
@@ -139,7 +141,7 @@ const transporter = nodemailer.createTransport({
         const hashedOTP = await bcrypt.hash(otp, saltRounds);
 
         // Сохраняем OTP в базе данных
-        const newOtpVerification = await new UserOTPVerification({
+        const newOtpVerification = new UserOTPVerification({
             userId: _id,
             realOtp: otp,
             otp: hashedOTP,
@@ -148,11 +150,11 @@ const transporter = nodemailer.createTransport({
         });
 
         await newOtpVerification.save();
-        await transporter.sendMail(mailOptions); // Отправляем email
+        await transporter.sendMail(mailOptions);  // Отправляем email
         console.log('Email отправлен успешно');
 
     } catch (error) {
-        console.error("Ошибка при отправке email:", error.message); // Выводим ошибку для отладки
+        console.error("Ошибка при отправке email:", error.message);  // Выводим ошибку для отладки
         throw new Error(error.message);
     }
 };
