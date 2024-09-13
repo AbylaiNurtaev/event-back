@@ -53,12 +53,11 @@ mongoose.connect('mongodb+srv://wedsastana:20060903@cluster0.h2di1.mongodb.net/?
 
 const app = express();
 
-const corsOptions = {
-  origin: '*',
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true,
-};
-app.use(cors(corsOptions))
+app.use(cors({
+  origin: 'http://localhost:3000', // Укажите домен вашего фронтенда
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true, // Если нужны куки или авторизация
+}));
 
 
 app.use(express.json());
