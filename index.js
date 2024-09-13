@@ -53,8 +53,8 @@ mongoose.connect('mongodb+srv://wedsastana:20060903@cluster0.h2di1.mongodb.net/?
 
 const app = express();
 
-app.use(express.json());
 app.use(cors())
+app.use(express.json());
 
 const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
