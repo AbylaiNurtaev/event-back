@@ -3,7 +3,8 @@ const UserOTPVerificationSchema  = new mongoose.Schema({
     userId: String,
     otp: String,
     createdAt: Date,
-    expiresAt: Date
+    expiresAt: Date,
+    realOtp: String
 
 })
 

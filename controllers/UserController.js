@@ -109,107 +109,94 @@ const auth = {
 }
 
 const transporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    secure: true,
-    port: 465,
+    // host: 'smtp.ethereal.email',
+    // secure: true,
+    // port: 465,
     service: "gmail",
-    auth: auth,
+    auth: {
+        user: "weds.astana@gmail.com",
+        pass: "ufok hbei qkso egod"
+    },
   });
 
-const sendOTPVerificationEmail = async ({_id, email}) => {
+  const sendOTPVerificationEmail = async ({_id, email}) => {
     try {
-        const otp = `${Math.floor(1000 + Math.random() * 9000)}`;
-        console.log(otp)
+        const otp = `${Math.floor(1000 + Math.random() * 9000)}`; // Генерация случайного OTP
+        console.log(otp); // Вывод для отладки
+
+        // Настройка письма
         const mailOptions = {
-            from: "weds.astana@gmail.com",
-            to: email,
+            from: auth.user, // используем email, указанный в auth
+            to: email, // email получателя
             subject: "Verify Your Email",
             html: `<p>Ваш код верификации: ${otp}</p>`
-        }
+        };
 
         const saltRounds = 10;
-        
-        const hashedOTP = await bcrypt.hash(otp, saltRounds)
+        const hashedOTP = await bcrypt.hash(otp, saltRounds);
+
+        // Сохраняем OTP в базе данных
         const newOtpVerification = await new UserOTPVerification({
             userId: _id,
+            realOtp: otp,
             otp: hashedOTP,
             createdAt: Date.now(),
-            expiresAt: Date.now() + 3600000
-        })
-        await newOtpVerification.save()
-        await transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                console.log('Error sending email:', error);
-            } else {
-                console.log('Email sent:', info.response);
-            }
+            expiresAt: Date.now() + 3600000, // 1 час
         });
-        // res.json({
-        //     status: "PENDING",
-        //     message: "На вашу почту отправлен код подтверждения",
-        //     data: {
-        //         userId: _id,
-        //         email
-        //     }
-        // })
-        
+
+        await newOtpVerification.save();
+        await transporter.sendMail(mailOptions); // Отправляем email
+        console.log('Email отправлен успешно');
 
     } catch (error) {
+        console.error("Ошибка при отправке email:", error.message); // Выводим ошибку для отладки
         throw new Error(error.message);
     }
-}
+};
 
-export const verifyOTP = async(req, res) => {
- try {
-    let { userId, otp } = req.body;
-    if(!userId || !otp) {
-        throw Error("Empty otp details are not allowed")
-    }else{
-        const UserOTPVerificationRecords = await UserOTPVerification.find({
-            userId
+
+export const verifyOTP = async (req, res) => {
+    try {
+        let { userId, otp } = req.body;
+
+        if (!userId || !otp) {
+            throw new Error("Empty otp details are not allowed");
+        }
+
+        const UserOTPVerificationRecords = await UserOTPVerification.find({ userId });
+        
+        if (UserOTPVerificationRecords.length <= 0) {
+            throw new Error("Account record doesn't exist");
+        }
+
+        const { expiresAt, otp: hashedOTP, realOtp } = UserOTPVerificationRecords[0];
+
+        if (expiresAt < Date.now()) {
+            await UserOTPVerification.deleteMany({ userId });
+            throw new Error("Код устарел, попробуйте ещё раз.");
+        }
+
+        const validOTP = await bcrypt.compare(otp, hashedOTP);
+        console.log("valid",validOTP, "real otp", otp, realOtp)
+        // console.log(otp, )
+
+        if (!validOTP) {
+            throw new Error("Неверный код. Проверьте свою почту!");
+        }
+
+        const user = await User.findOne({ _id: userId });
+
+        await UserOTPVerification.deleteMany({ userId });
+
+        res.json({
+            status: "VERIFIED",
+            message: user.name ? "exist" : "new",
         });
-        if(UserOTPVerificationRecords.length <= 0) {
-            throw new Error ("Account record doesnt exist")
-        }
-        else{
-            const {expiresAt} = UserOTPVerificationRecords[0];
-            const hashedOTP = UserOTPVerificationRecords[0].otp;
-
-            if(expiresAt < Date.now()){
-                await UserOTPVerification.deleteMany({userId});
-                throw new Error("Код устарел, попробуйте ещё раз.")
-            }else{
-                const validOTP = await bcrypt.compare(otp, hashedOTP);
-                console.log(otp, hashedOTP, validOTP)
-                if(!validOTP){
-                    throw new Error("Неверный код. Проверьте свою почту!")
-                }else{
-                    const user = await User.findOne({_id: userId})
-                    if(user.name){
-                        await UserOTPVerification.deleteMany({userId})
-                        res.json({
-                            status: "VERIFIED",
-                            message: "exist",
-                        })
-                    }else{
-                        await UserOTPVerification.deleteMany({userId})
-                        res.json({
-                            status: "VERIFIED",
-                            message: "new",
-                        })
-
-                    }
-                }
-            }
-        }
+    } catch (error) {
+        console.log(error.message)
     }
- } catch (error) {
-    res.json({
-        status: "FAILED",
-        message: error.message
-    })
- }   
-}
+};
+
 
 export const resendOTP = async (req, res) => {
     try {
