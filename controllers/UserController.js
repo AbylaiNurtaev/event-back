@@ -1,296 +1,234 @@
 import jwt from 'jsonwebtoken';
 import argon2 from 'argon2';
-import UserModel from './../models/User.js';
-
-import nodemailer from 'nodemailer'
-import bcrypt from 'bcrypt'
-import UserOTPVerification from '../models/UserOTPVerification.js';
-
+import nodemailer from 'nodemailer';
+import bcrypt from 'bcrypt';
 import Mailgen from 'mailgen';
+import UserModel from './../models/User.js';
+import UserOTPVerification from '../models/UserOTPVerification.js';
 import User from './../models/User.js';
 
-export const updateInfo = async(req, res) => {
+// Обновление основной информации о пользователе
+export const updateInfo = async (req, res) => {
     try {
-        const user = await User.findOneAndUpdate({ _id: req.body.userId },
+        const user = await User.findOneAndUpdate(
+            { _id: req.body.userId },
             {
-                // email: req.body.email,
                 company: req.body.company,
                 name: req.body.name,
-                // photo: req.body.photo,
                 nomination: req.body.nomination,
                 job: req.body.job,
                 about: req.body.about,
             },
             { new: true }
-        )
-        if(!user){
-            throw new Error("Пользователь не найден")
-        }
-        res.json(user)
-    } catch (error) {
-        console.log(error.message)
-    }
-}
+        );
 
-export const updateSocialInfo = async(req, res) => {
+        if (!user) {
+            return res.status(404).json({ message: "Пользователь не найден" });
+        }
+
+        res.json(user);
+    } catch (error) {
+        console.log(error.message);
+        res.status(500).json({ message: "Ошибка при обновлении информации" });
+    }
+};
+
+// Обновление информации о социальных сетях
+export const updateSocialInfo = async (req, res) => {
     try {
-        const user = await User.findOneAndUpdate({ _id: req.body.userId },
+        const user = await User.findOneAndUpdate(
+            { _id: req.body.userId },
             {
-                // email: req.body.email,
                 instagram: req.body.instagram,
                 vk: req.body.vk,
-                // photo: req.body.photo,
                 tiktok: req.body.tiktok,
                 youtube: req.body.youtube,
             },
             { new: true }
-        )
-        if(!user){
-            throw new Error("Пользователь не найден")
-        }
-        res.json(user)
-    } catch (error) {
-        console.log(error.message)
-    }
-}
+        );
 
+        if (!user) {
+            return res.status(404).json({ message: "Пользователь не найден" });
+        }
+
+        res.json(user);
+    } catch (error) {
+        console.log(error.message);
+        res.status(500).json({ message: "Ошибка при обновлении социальной информации" });
+    }
+};
+
+// Регистрация пользователя
 export const register = async (req, res) => {
     try {
         const existUser = await UserModel.findOne({ email: req.body.email });
-        if(existUser){
-            sendOTPVerificationEmail({_id: existUser._id, email: req.body.email})
-            const token = jwt.sign({
-                _id: existUser._id,
-            }, 'secret123', {
-                expiresIn: "30d",
-            });
-    
+
+        if (existUser) {
+            sendOTPVerificationEmail({ _id: existUser._id, email: req.body.email });
+            const token = jwt.sign({ _id: existUser._id }, 'secret123', { expiresIn: "30d" });
+
             const { ...userData } = existUser._doc;
-            res.json({
-                ...userData,
-                token,
-            });
-        }else{
-            const doc = new UserModel({
-                email: req.body.email,
-                role: req.body.role,
-                verified: false
-            });
-    
-            const user = await doc.save().then((result) => {
-                sendOTPVerificationEmail(result);
-                return result;
-            });
-    
-            const token = jwt.sign({
-                _id: user._id
-            }, 'secret123', {
-                expiresIn: "30d",
-            });
-    
-            const { passwordHash, ...userData } = user._doc;
-            res.json({
-                ...userData,
-                token,
-            });
+            return res.json({ ...userData, token });
         }
+
+        const doc = new UserModel({
+            email: req.body.email,
+            role: req.body.role,
+            verified: false
+        });
+
+        const user = await doc.save();
+        sendOTPVerificationEmail({ _id: user._id, email: user.email });
+
+        const token = jwt.sign({ _id: user._id }, 'secret123', { expiresIn: "30d" });
+        const { passwordHash, ...userData } = user._doc;
+
+        res.json({ ...userData, token });
 
     } catch (err) {
         console.log(err);
-        res.status(500).json({
-            message: "Не удалось зарегистрироваться",
-        });
+        res.status(500).json({ message: "Не удалось зарегистрироваться" });
     }
-}
+};
 
+// Настройка отправки почты
 const transporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    secure: true,
-    port: 465,
     service: "gmail",
     auth: {
-      user: "weds.astana@gmail.com",
-      pass: "ufok hbei qkso egod",
+        user: "weds.astana@gmail.com",
+        pass: "ufok hbei qkso egod",
     },
-  });
+});
 
-const sendOTPVerificationEmail = async ({_id, email}) => {
+// Отправка кода верификации
+const sendOTPVerificationEmail = async ({ _id, email }) => {
     try {
         const otp = `${Math.floor(1000 + Math.random() * 9000)}`;
-        console.log(otp)
         const mailOptions = {
             from: "weds.astana@gmail.com",
             to: email,
             subject: "Verify Your Email",
-            html: `<p>Ваш код верификации: ${otp}</p>`
-        }
+            html: `<p>Ваш код верификации: ${otp}</p>`,
+        };
 
-        const saltRounds = 10;
-        
-        const hashedOTP = await bcrypt.hash(otp, saltRounds)
-        const newOtpVerification = await new UserOTPVerification({
+        const hashedOTP = await bcrypt.hash(otp, 10);
+        const newOtpVerification = new UserOTPVerification({
             userId: _id,
             otp: hashedOTP,
             createdAt: Date.now(),
-            expiresAt: Date.now() + 3600000
-        })
-        await newOtpVerification.save()
-        await transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                console.log('Error sending email:', error);
-            } else {
-                console.log('Email sent:', info.response);
-            }
+            expiresAt: Date.now() + 3600000, // 1 час
         });
-        // res.json({
-        //     status: "PENDING",
-        //     message: "На вашу почту отправлен код подтверждения",
-        //     data: {
-        //         userId: _id,
-        //         email
-        //     }
-        // })
-        
+
+        await newOtpVerification.save();
+        await transporter.sendMail(mailOptions);
 
     } catch (error) {
         throw new Error(error.message);
     }
-}
+};
 
-export const verifyOTP = async(req, res) => {
- try {
-    let { userId, otp } = req.body;
-    if(!userId || !otp) {
-        throw Error("Empty otp details are not allowed")
-    }else{
-        const UserOTPVerificationRecords = await UserOTPVerification.find({
-            userId
-        });
-        if(UserOTPVerificationRecords.length <= 0) {
-            throw new Error ("Account record doesn`t exist")
-        }
-        else{
-            const {expiresAt} = UserOTPVerificationRecords[0];
-            const hashedOTP = UserOTPVerificationRecords[0].otp;
-
-            if(expiresAt < Date.now()){
-                await UserOTPVerification.deleteMany({userId});
-                throw new Error("Код устарел, попробуйте ещё раз.")
-            }else{
-                const validOTP = await bcrypt.compare(otp, hashedOTP);
-                console.log(otp, hashedOTP, validOTP)
-                if(!validOTP){
-                    throw new Error("Неверный код. Проверьте свою почту!")
-                }else{
-                    const user = await User.findOne({_id: userId})
-                    if(user.name){
-                        await UserOTPVerification.deleteMany({userId})
-                        res.json({
-                            status: "VERIFIED",
-                            message: "exist",
-                        })
-                    }else{
-                        await UserOTPVerification.deleteMany({userId})
-                        res.json({
-                            status: "VERIFIED",
-                            message: "new",
-                        })
-
-                    }
-                }
-            }
-        }
-    }
- } catch (error) {
-    res.json({
-        status: "FAILED",
-        message: error.message
-    })
- }   
-}
-
-export const resendOTP = async (req, res) => {
+// Верификация OTP
+export const verifyOTP = async (req, res) => {
     try {
-        let { userId, email } = req.body;
+        const { userId, otp } = req.body;
 
-        if (!userId || !email) {
-            throw new Error("Не получилось найти такой email");
+        if (!userId || !otp) {
+            return res.status(400).json({ message: "Пустые данные не допускаются" });
         }
 
-        // Удаляем старые записи перед созданием нового OTP
+        const userOTPRecords = await UserOTPVerification.find({ userId });
+        if (userOTPRecords.length <= 0) {
+            return res.status(404).json({ message: "Запись не найдена" });
+        }
+
+        const { expiresAt, otp: hashedOTP } = userOTPRecords[0];
+        if (expiresAt < Date.now()) {
+            await UserOTPVerification.deleteMany({ userId });
+            return res.status(400).json({ message: "Код устарел, попробуйте ещё раз" });
+        }
+
+        const validOTP = await bcrypt.compare(otp, hashedOTP);
+        if (!validOTP) {
+            return res.status(400).json({ message: "Неверный код" });
+        }
+
+        const user = await User.findOne({ _id: userId });
         await UserOTPVerification.deleteMany({ userId });
 
-        // Генерируем и отправляем новый код
-        await sendOTPVerificationEmail({ _id: userId, email });
+        res.json({ status: "VERIFIED", message: user.name ? "exist" : "new" });
 
-        res.json({
-            status: "PENDING",
-            message: "Письмо отправлено на вашу почту"
-        });
     } catch (error) {
-        res.json({
-            status: "FAILED",
-            message: error.message
-        });
+        res.status(500).json({ message: error.message });
     }
 };
 
+// Повторная отправка OTP
+export const resendOTP = async (req, res) => {
+    try {
+        const { userId, email } = req.body;
 
+        if (!userId || !email) {
+            return res.status(400).json({ message: "Данные не найдены" });
+        }
 
+        await UserOTPVerification.deleteMany({ userId });
+        await sendOTPVerificationEmail({ _id: userId, email });
 
+        res.json({ status: "PENDING", message: "Письмо отправлено" });
 
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Получение пользователя по токену
 export const getUserByToken = async (req, res) => {
     try {
         const token = (req.headers.authorization || '').replace(/Bearer\s?/, '');
-        const decoded = jwt.verify(token, 'secret123')
+        const decoded = jwt.verify(token, 'secret123');
 
-        const user = await User.findOne({ _id: decoded._id });        
-
+        const user = await User.findOne({ _id: decoded._id });
         if (!user) {
-            return res.json({
-                message: "Пользователь не найден"
-            });
+            return res.status(404).json({ message: "Пользователь не найден" });
         }
 
-
         const { ...userData } = user._doc;
-        res.json({
-            ...userData,
-            token,
-        });
+        res.json({ ...userData, token });
 
     } catch (err) {
         console.log(err);
-        res.status(500).json({
-            message: "Не удалось авторизоваться"
-        });
+        res.status(500).json({ message: "Не удалось авторизоваться" });
     }
-}
+};
 
-
+// Авторизация админа
 export const loginAdmin = async (req, res) => {
-    const id = req.body.id;
-    const user = await User.findOne({ _id: id })
+    try {
+        const { id } = req.body;
+        const user = await User.findOne({ _id: id });
 
-    if(user && user.role == "admin"){
-        res.json("success")
-    }else{
-        return res.status(500).json({
-            message: "Не получилось авторизоваться",
-        });
+        if (user && user.role === "admin") {
+            res.json("success");
+        } else {
+            res.status(403).json({ message: "Не удалось авторизоваться" });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
-}
+};
 
-
+// Авторизация жюри
 export const loginJoury = async (req, res) => {
-    const id = req.body.id;
-    const user = await User.findOne({ _id: id })
+    try {
+        const { id } = req.body;
+        const user = await User.findOne({ _id: id });
 
-    if(user && user.role == "joury"){
-        res.json("success")
-    }else{
-        return res.status(500).json({
-            message: "Не получилось авторизоваться",
-        });
+        if (user && user.role === "joury") {
+            res.json("success");
+        } else {
+            res.status(403).json({ message: "Не удалось авторизоваться" });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
-}
+};
