@@ -111,60 +111,65 @@ const auth = {
 }
 
 const transporter = nodemailer.createTransport({
-    // host: 'smtp.ethereal.email',
-    // secure: true,
-    // port: 465,
-    service: "gmail",
+    service: 'gmail',
     auth: {
-        // user: "weds.astana@gmail.com",
-        // pass: "ufok hbei qkso egod"
-        user: process.env.USER,
-        pass: process.env.PASS
+      user: auth.user,
+      pass: auth.pass,
     },
+    secure: true, // Используем безопасное соединение
   });
+
+  const verifyTransporter = async () => {
+    try {
+      await transporter.verify();
+      console.log('SMTP сервер готов для отправки сообщений');
+    } catch (error) {
+      console.error('Ошибка при проверке соединения SMTP:', error);
+      throw error;
+    }
+  };
+  
 
   const sendOTPVerificationEmail = async ({ _id, email }) => {
     try {
-        // Генерация случайного OTP
-        const otp = crypto.randomInt(1000, 9999).toString();  // Используем криптографически стойкий генератор случайных чисел
-        console.log(otp);  // Вывод для отладки
-
-        // Настройка письма
-        const mailOptions = {
-            from: auth.user, // используем email, указанный в auth
-            to: email, // email получателя
-            subject: "Verify Your Email",
-            html: `<p>Ваш код верификации: ${otp}</p>`
-        };
-
-        const saltRounds = 10;
-        const hashedOTP = await bcrypt.hash(otp, saltRounds);
-
-        // Сохраняем OTP в базе данных
-        const newOtpVerification = new UserOTPVerification({
-            userId: _id,
-            realOtp: otp,
-            otp: hashedOTP,
-            createdAt: Date.now(),
-            expiresAt: Date.now() + 3600000, // 1 час
-        });
-
-        await newOtpVerification.save();
-        await transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                console.log("Ошибка при отправке письма:", error);
-            } else {
-                console.log("Письмо успешно отправлено:", info.response);
-            }
-        });
-          // Отправляем email
-        console.log('Email отправлен успешно');
-
+      // Генерация случайного OTP
+      const otp = crypto.randomInt(1000, 9999).toString(); // Криптографически стойкий генератор случайных чисел
+      console.log(otp); // Вывод для отладки
+  
+      // Настройка письма
+      const mailOptions = {
+        from: auth.user, // используем email, указанный в auth
+        to: email, // email получателя
+        subject: 'Verify Your Email',
+        html: `<p>Ваш код верификации: ${otp}</p>`,
+      };
+  
+      // Хешируем OTP перед сохранением в базу данных
+      const saltRounds = 10;
+      const hashedOTP = await bcrypt.hash(otp, saltRounds);
+  
+      // Сохраняем OTP в базе данных
+      const newOtpVerification = new UserOTPVerification({
+        userId: _id,
+        otp: hashedOTP,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 3600000, // 1 час
+      });
+  
+      await newOtpVerification.save();
+  
+      // Проверяем соединение перед отправкой
+      await verifyTransporter();
+  
+      // Отправляем email с OTP
+      await transporter.sendMail(mailOptions);
+      console.log('Email отправлен успешно');
     } catch (error) {
-        console.error("Ошибка при отправке email:", error.message);  // Выводим ошибку для отладки
-        throw new Error(error.message);
+      console.error('Ошибка при отправке email:', error.message);
+      throw new Error(error.message);
     }
-};
+  };
+  
 
 
 export const verifyOTP = async (req, res) => {
