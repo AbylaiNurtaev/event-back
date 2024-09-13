@@ -6,35 +6,95 @@ import nodemailer from 'nodemailer'
 import bcrypt from 'bcrypt'
 import UserOTPVerification from '../models/UserOTPVerification.js';
 
+import Mailgen from 'mailgen';
+import User from './../models/User.js';
+
+export const updateInfo = async(req, res) => {
+    try {
+        const user = await User.findOneAndUpdate({ _id: req.body.userId },
+            {
+                // email: req.body.email,
+                company: req.body.company,
+                name: req.body.name,
+                // photo: req.body.photo,
+                nomination: req.body.nomination,
+                job: req.body.job,
+                about: req.body.about,
+            },
+            { new: true }
+        )
+        if(!user){
+            throw new Error("Пользователь не найден")
+        }
+        res.json(user)
+    } catch (error) {
+        console.log(error.message)
+    }
+}
+
+export const updateSocialInfo = async(req, res) => {
+    try {
+        const user = await User.findOneAndUpdate({ _id: req.body.userId },
+            {
+                // email: req.body.email,
+                instagram: req.body.instagram,
+                vk: req.body.vk,
+                // photo: req.body.photo,
+                tiktok: req.body.tiktok,
+                youtube: req.body.youtube,
+            },
+            { new: true }
+        )
+        if(!user){
+            throw new Error("Пользователь не найден")
+        }
+        res.json(user)
+    } catch (error) {
+        console.log(error.message)
+    }
+}
+
 export const register = async (req, res) => {
     try {
-        const password = req.body.password;
-        const hash = await argon2.hash(password);
+        const existUser = await UserModel.findOne({ email: req.body.email });
+        if(existUser){
+            sendOTPVerificationEmail({_id: existUser._id, email: req.body.email})
+            const token = jwt.sign({
+                _id: existUser._id,
+            }, 'secret123', {
+                expiresIn: "30d",
+            });
+    
+            const { ...userData } = existUser._doc;
+            res.json({
+                ...userData,
+                token,
+            });
+        }else{
+            const doc = new UserModel({
+                email: req.body.email,
+                role: req.body.role,
+                verified: false
+            });
+    
+            const user = await doc.save().then((result) => {
+                sendOTPVerificationEmail(result);
+                return result;
+            });
+    
+            const token = jwt.sign({
+                _id: user._id
+            }, 'secret123', {
+                expiresIn: "30d",
+            });
+    
+            const { passwordHash, ...userData } = user._doc;
+            res.json({
+                ...userData,
+                token,
+            });
+        }
 
-        const doc = new UserModel({
-            email: req.body.email,
-            passwordHash: hash,
-            role: req.body.role,
-            verified: false
-        });
-
-        const user = await doc.save().then((result) => {
-            sendOTPVerificationEmail(result);
-            console.log(result)
-            return result;
-        });
-
-        const token = jwt.sign({
-            _id: user._id
-        }, 'secret123', {
-            expiresIn: "30d",
-        });
-
-        const { passwordHash, ...userData } = user._doc;
-        res.json({
-            ...userData,
-            token,
-        });
     } catch (err) {
         console.log(err);
         res.status(500).json({
@@ -44,21 +104,22 @@ export const register = async (req, res) => {
 }
 
 const transporter = nodemailer.createTransport({
-    host: 'smtppro.zoho.in',
-    secure: false,
-    port: 587,
+    // host: 'smtp.ethereal.email',
+    // secure: true,
+    // port: 465,
+    service: "gmail",
     auth: {
       user: "weds.astana@gmail.com",
-      pass: "eYV6qZHGzmVt",
+      pass: "ufok hbei qkso egod",
     },
   });
 
 const sendOTPVerificationEmail = async ({_id, email}) => {
     try {
-        const otp = `${1000 + Math.random * 9000} `;
-
+        const otp = `${Math.floor(1000 + Math.random() * 9000)}`;
+        console.log(otp)
         const mailOptions = {
-            from: "krutyev5@gmail.com",
+            from: "weds.astana@gmail.com",
             to: email,
             subject: "Verify Your Email",
             html: `<p>Ваш код верификации: ${otp}</p>`
@@ -90,32 +151,103 @@ const sendOTPVerificationEmail = async ({_id, email}) => {
     }
 }
 
+export const verifyOTP = async(req, res) => {
+ try {
+    let { userId, otp } = req.body;
+    if(!userId || !otp) {
+        throw Error("Empty otp details are not allowed")
+    }else{
+        const UserOTPVerificationRecords = await UserOTPVerification.find({
+            userId
+        });
+        if(UserOTPVerificationRecords.length <= 0) {
+            throw new Error ("Account record doesn`t exist")
+        }
+        else{
+            const {expiresAt} = UserOTPVerificationRecords[0];
+            const hashedOTP = UserOTPVerificationRecords[0].otp;
 
-export const login = async (req, res) => {
+            if(expiresAt < Date.now()){
+                await UserOTPVerification.deleteMany({userId});
+                throw new Error("Код устарел, попробуйте ещё раз.")
+            }else{
+                const validOTP = await bcrypt.compare(otp, hashedOTP);
+                console.log(otp, hashedOTP, validOTP)
+                if(!validOTP){
+                    throw new Error("Неверный код. Проверьте свою почту!")
+                }else{
+                    const user = await User.findOne({_id: userId})
+                    if(user.name){
+                        await UserOTPVerification.deleteMany({userId})
+                        res.json({
+                            status: "VERIFIED",
+                            message: "exist",
+                        })
+                    }else{
+                        await UserOTPVerification.deleteMany({userId})
+                        res.json({
+                            status: "VERIFIED",
+                            message: "new",
+                        })
+
+                    }
+                }
+            }
+        }
+    }
+ } catch (error) {
+    res.json({
+        status: "FAILED",
+        message: error.message
+    })
+ }   
+}
+
+export const resendOTP = async (req, res) => {
     try {
-        const user = await UserModel.findOne({ email: req.body.email });
+        let { userId, email } = req.body;
+
+        if (!userId || !email) {
+            throw new Error("Не получилось найти такой email");
+        }
+
+        // Удаляем старые записи перед созданием нового OTP
+        await UserOTPVerification.deleteMany({ userId });
+
+        // Генерируем и отправляем новый код
+        await sendOTPVerificationEmail({ _id: userId, email });
+
+        res.json({
+            status: "PENDING",
+            message: "Письмо отправлено на вашу почту"
+        });
+    } catch (error) {
+        res.json({
+            status: "FAILED",
+            message: error.message
+        });
+    }
+};
+
+
+
+
+
+export const getUserByToken = async (req, res) => {
+    try {
+        const token = (req.headers.authorization || '').replace(/Bearer\s?/, '');
+        const decoded = jwt.verify(token, 'secret123')
+
+        const user = await User.findOne({ _id: decoded._id });        
 
         if (!user) {
-            return res.status(404).json({
+            return res.json({
                 message: "Пользователь не найден"
             });
         }
 
-        const isValidPass = await argon2.verify(user._doc.passwordHash, req.body.password);
 
-        if (!isValidPass) {
-            return res.status(400).json({
-                message: "Неверный логин или пароль"
-            });
-        }
-
-        const token = jwt.sign({
-            _id: user._id,
-        }, 'secret123', {
-            expiresIn: "30d",
-        });
-
-        const { passwordHash, ...userData } = user._doc;
+        const { ...userData } = user._doc;
         res.json({
             ...userData,
             token,
@@ -125,6 +257,34 @@ export const login = async (req, res) => {
         console.log(err);
         res.status(500).json({
             message: "Не удалось авторизоваться"
+        });
+    }
+}
+
+
+export const loginAdmin = async (req, res) => {
+    const id = req.body.id;
+    const user = await User.findOne({ _id: id })
+
+    if(user && user.role == "admin"){
+        res.json("success")
+    }else{
+        return res.status(500).json({
+            message: "Не получилось авторизоваться",
+        });
+    }
+}
+
+
+export const loginJoury = async (req, res) => {
+    const id = req.body.id;
+    const user = await User.findOne({ _id: id })
+
+    if(user && user.role == "joury"){
+        res.json("success")
+    }else{
+        return res.status(500).json({
+            message: "Не получилось авторизоваться",
         });
     }
 }

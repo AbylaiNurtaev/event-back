@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-// dasdasda
+
 const ArticleSchema = new mongoose.Schema({
     titles: {
         type: [String],

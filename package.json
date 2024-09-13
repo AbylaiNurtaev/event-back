@@ -15,20 +15,25 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.645.0",
+    "@aws-sdk/s3-request-presigner": "^3.645.0",
     "argon2": "^0.40.3",
     "atlas": "^1.0.0-alpha.0",
     "bcrypt": "^5.1.1",
     "chalk": "^5.3.0",
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-validator": "^7.0.1",
     "heroku": "^8.11.5",
     "jsonwebtoken": "^9.0.2",
+    "mailgen": "^2.0.28",
     "mongodb": "^6.7.0",
     "mongoose": "^8.4.0",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.14",
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "sharp": "^0.33.5"
   }
 }
