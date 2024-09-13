@@ -150,7 +150,14 @@ const transporter = nodemailer.createTransport({
         });
 
         await newOtpVerification.save();
-        await transporter.sendMail(mailOptions);  // Отправляем email
+        await transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.log("Ошибка при отправке письма:", error);
+            } else {
+                console.log("Письмо успешно отправлено:", info.response);
+            }
+        });
+          // Отправляем email
         console.log('Email отправлен успешно');
 
     } catch (error) {
