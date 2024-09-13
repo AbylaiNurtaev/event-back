@@ -114,8 +114,10 @@ const transporter = nodemailer.createTransport({
     // port: 465,
     service: "gmail",
     auth: {
-        user: "weds.astana@gmail.com",
-        pass: "ufok hbei qkso egod"
+        // user: "weds.astana@gmail.com",
+        // pass: "ufok hbei qkso egod"
+        user: process.env.USER,
+        pass: process.env.PASS
     },
   });
 
