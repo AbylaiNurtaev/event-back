@@ -58,52 +58,32 @@ export const updateSocialInfo = async(req, res) => {
 
 export const register = async (req, res) => {
     try {
-        const existUser = await UserModel.findOne({ email: req.body.email });
-        if(existUser){
-            sendOTPVerificationEmail({_id: existUser._id, email: req.body.email})
-            const token = jwt.sign({
-                _id: existUser._id,
-            }, 'secret123', {
-                expiresIn: "30d",
-            });
-    
-            const { ...userData } = existUser._doc;
-            res.json({
-                ...userData,
-                token,
-            });
-        }else{
-            const doc = new UserModel({
-                email: req.body.email,
-                role: req.body.role,
-                verified: false
-            });
-    
-            const user = await doc.save().then((result) => {
-                sendOTPVerificationEmail(result);
-                return result;
-            });
-    
-            const token = jwt.sign({
-                _id: user._id
-            }, 'secret123', {
-                expiresIn: "30d",
-            });
-    
-            const { passwordHash, ...userData } = user._doc;
-            res.json({
-                ...userData,
-                token,
-            });
-        }
-
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            message: "Не удалось зарегистрироваться",
+      const existUser = await User.findOne({ email: req.body.email });
+      if (existUser) {
+        await sendOTPVerificationEmail({ _id: existUser._id, email: req.body.email });
+        const token = jwt.sign({ _id: existUser._id }, 'secret123', { expiresIn: '30d' });
+  
+        res.json({ token, ...existUser._doc });
+      } else {
+        const newUser = new User({
+          email: req.body.email,
+          role: req.body.role,
+          verified: false,
         });
+  
+        const savedUser = await newUser.save();
+        await sendOTPVerificationEmail({ _id: savedUser._id, email: req.body.email });
+  
+        const token = jwt.sign({ _id: savedUser._id }, 'secret123', { expiresIn: '30d' });
+  
+        res.json({ token, ...savedUser._doc });
+      }
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({ message: 'Не удалось зарегистрироваться' });
     }
-}
+  };
+  
 
 const auth = {
     user: process.env.USER,
