@@ -6,10 +6,19 @@ import nodemailer from 'nodemailer'
 import bcrypt from 'bcrypt'
 import UserOTPVerification from '../models/UserOTPVerification.js';
 
+import formData from 'form-data'
+import Mailgun from 'mailgun.js'
+
 dotenv.config();
 import crypto from 'crypto';
 import Mailgen from 'mailgen';
 import User from './../models/User.js';
+
+
+const mailgun = new Mailgun(formData);
+const mg = mailgun.client({username: 'api', key: '826eddfb-4dbb6466' || 'key-yourkeyhere'});
+
+
 
 export const updateInfo = async(req, res) => {
     try {
@@ -112,6 +121,15 @@ const transporter = nodemailer.createTransport({
 
   const sendOTPVerificationEmail = async ({ _id, email }) => {
     try {
+        mg.messages.create('sandboxeef53338f84b4603ab4f2068a850c793.mailgun.org', {
+            from: "weds.astana@gmail.com",
+            to: "weds.astana@gmail.com",
+            subject: "Hello",
+            text: "Testing some Mailgun awesomeness!",
+            html: "<h1>Testing some Mailgun awesomeness!</h1>"
+        })
+        .then(msg => console.log(msg)) // logs response data
+        .catch(err => console.log(err)); // logs any error
       // Генерация случайного OTP
       const otp = crypto.randomInt(1000, 9999).toString(); // Криптографически стойкий генератор случайных чисел
       console.log(otp); // Вывод для отладки
