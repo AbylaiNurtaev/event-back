@@ -60,6 +60,7 @@ export const register = async (req, res) => {
     try {
       const existUser = await User.findOne({ email: req.body.email });
       if (existUser) {
+        await UserOTPVerification.deleteMany({ userId: existUser._id });
         await sendOTPVerificationEmail({ _id: existUser._id, email: req.body.email });
         const token = jwt.sign({ _id: existUser._id }, 'secret123', { expiresIn: '30d' });
   
