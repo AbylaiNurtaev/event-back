@@ -195,6 +195,27 @@ export const verifyOTP = async (req, res) => {
     }
 };
 
+export const setJoury = async(req, res) => {
+    try {
+        const email = req.body.email;
+        let user = await User.findOneAndUpdate(
+            {email},
+            {
+                role: "joury"
+            },
+            { new: true }
+        )
+        if(user){
+            res.json({ message: "Вы успешно зарегестрировали Жюри!" })
+        }else{
+            res.json({ message: "Жюри ещё не зарегестрировался на сайте" })
+        }
+    } catch (error) {
+        res.status(404).json({
+            message: "Ошибка"
+        })
+    }
+}
 
 export const resendOTP = async (req, res) => {
     try {
@@ -247,10 +268,8 @@ export const getUserByToken = async (req, res) => {
         });
 
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            message: "Не удалось авторизоваться"
-        });
+        
+        
     }
 }
 

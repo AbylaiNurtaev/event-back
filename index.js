@@ -11,6 +11,7 @@ import sharp from 'sharp';
 
 import cors from 'cors'
 import * as UserController from './controllers/UserController.js'
+import * as NominationController from './controllers/NominationController.js'
 import jwt from 'jsonwebtoken'
 
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -55,7 +56,7 @@ const app = express();
 
 app.use(cors({
   origin: '*', // Укажите домен вашего фронтенда
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET','PATCH', 'POST', 'PUT', 'DELETE'],
   credentials: true, // Если нужны куки или авторизация
 }));
 
@@ -69,14 +70,15 @@ const upload = multer({ storage: storage })
 app.post('/api/uploadPortfolio/:id', upload.array('images', 50), async (req, res) => {
   try {
     const id = req.params.id;
-    const application_id = req.body.application_id
-    
-    const files = req.files; // Получаем массив файлов
+    const application_id = req.body.application_id;
+
+    // Flatten the array of arrays into a single array
+    const files = req.files.flat();
     const uploadedImages = [];
 
     for (let file of files) {
-      const buffer = await sharp(file.buffer).toBuffer(); // Обрабатываем изображение через sharp
-      const imageName = randomImageName(); // Генерируем имя для изображения
+      const buffer = await sharp(file.buffer).toBuffer(); // Process the image using sharp
+      const imageName = randomImageName(); // Generate a unique name for the image
 
       const params = {
         Bucket: bucketName,
@@ -88,13 +90,60 @@ app.post('/api/uploadPortfolio/:id', upload.array('images', 50), async (req, res
       const command = new PutObjectCommand(params);
       await s3.send(command);
 
-      await uploadedImages.push(imageName); // Добавляем имя изображения в массив загруженных файлов
+      uploadedImages.push(imageName); // Add the image name to the array of uploaded images
     }
 
+    // Update the existing application data with the new images
+    let user = await User.findOneAndUpdate(
+      { _id: id, "applications.application_id": application_id },
+      { $set: { "applications.$.application_data": uploadedImages } }, // Update if the application_id exists
+      { new: true }
+    );
+
+    if (!user) {
+      // If the application with such application_id does not exist, create a new one
+      user = await User.findOneAndUpdate(
+        { _id: id },
+        { $push: { applications: { application_id: application_id, portfolio: uploadedImages } } }, // Push a new application object
+        { new: true }
+      );
+    }
+
+    res.json({ message: 'Фотографии успешно загружены', images: uploadedImages });
+  } catch (error) {
+    console.error('Ошибка загрузки фотографий:', error);
+    res.status(500).json({ message: 'Ошибка загрузки фотографий' });
+  }
+});
+
+
+app.post('/api/uploadDocuments/:id', upload.array('documents', 50), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const application_id = req.body.application_id;
+    
+    const files = req.files; // Получаем массив файлов
+    const uploadedDocuments = [];
+
+    for (let file of files) {
+      const documentName = randomImageName(); // Генерируем имя для документа
+
+      const params = {
+        Bucket: bucketName,
+        Key: documentName,
+        Body: file.buffer, // Загружаем файл напрямую
+        ContentType: file.mimetype // Указываем тип файла
+      };
+
+      const command = new PutObjectCommand(params);
+      await s3.send(command);
+
+      uploadedDocuments.push(documentName); // Добавляем имя файла в массив загруженных документов
+    }
 
     let user = await User.findOneAndUpdate(
       { _id: id, "applications.application_id": application_id },
-      { $set: { "applications.$.application_data": uploadedImages } }, // Обновление, если есть такой application_id
+      { $set: { "applications.$.documents": uploadedDocuments } }, // Обновление, если есть такой application_id
       { new: true }
     );
     
@@ -102,16 +151,19 @@ app.post('/api/uploadPortfolio/:id', upload.array('images', 50), async (req, res
       // Если заявки с таким application_id нет, создаём новую заявку
       user = await User.findOneAndUpdate(
         { _id: id },
-        { $push: { applications: { application_id: application_id, portfolio: uploadedImages } } }, // Пушим новый объект заявки
+        { $push: { applications: { application_id: application_id, documents: uploadedDocuments } } }, // Пушим новый объект заявки
         { new: true }
       );
     }
-    res.json({ message: 'Фотографии успешно загружены', images: uploadedImages });
+    
+    res.json({ message: 'Документы успешно загружены', documents: uploadedDocuments });
   } catch (error) {
-    console.error('Ошибка загрузки фотографий:', error);
-    res.status(500).json({ message: 'Ошибка загрузки фотографий' });
+    console.error('Ошибка загрузки документов:', error);
+    res.status(500).json({ message: 'Ошибка загрузки документов' });
   }
 });
+
+
 
 
 app.post('/api/uploadPreview/:id', upload.array('images', 10), async (req, res) => {
@@ -204,14 +256,14 @@ app.post('/auth/getUser', async (req, res) => {
         return res.json({ message: "Пользователь не найден" });
       }
 
-      if (!['avatar', 'logo', 'portfolio'].includes(type)) {
+      if (!['avatar', 'logo', 'portfolio', 'documents'].includes(type)) {
         return res.status(400).json({ message: "Invalid type" });
       }
 
       // Если запрашиваем портфолио
       if (type === 'portfolio') {
         if (!user.portfolio || user.portfolio.length === 0) {
-          return res.status(404).json({ message: "Портфолио не найдено" });
+          return res.json({ message: "Портфолио не найдено" });
         }
 
         // Генерация ссылок для каждого изображения в портфолио
@@ -226,12 +278,31 @@ app.post('/auth/getUser', async (req, res) => {
         }));
 
         user.portfolio = portfolioUrls;
-      } else {
+      }
+      else if( type == "documents" ){
+        if (!user.documents || user.documents.length === 0) {
+          return res.json({ message: "documents не найдено" });
+        }
+
+        // Генерация ссылок для каждого изображения в портфолио
+        const portfolioUrls = await Promise.all(user.documents.map(async (key) => {
+          const getObjectParams = {
+            Bucket: bucketName,
+            Key: key
+          };
+          const command = new GetObjectCommand(getObjectParams);
+          const url = await getSignedUrl(s3, command, { expiresIn: 3600 }); // Можно сделать ссылки постоянными
+          return url;
+        }));
+
+        user.documents = portfolioUrls;
+      }
+      else {
         // Генерация ссылки для avatar или logo
         const key = user[type]; // Динамически получаем поле avatar или logo
 
         if (!key) {
-          return res.status(404).json({ message: `Поле ${type} не найдено` });
+          return res.json( user );
         }
 
         const getObjectParams = {
@@ -334,10 +405,16 @@ app.post('/article',  ArticleController.create);
 app.delete('/article/:name', checkAdmin, ArticleController.remove);
 app.patch('/article/update/:title', checkAdmin, ArticleController.updateInfo);
 
+
+app.get('/nom', NominationController.getAll);
+app.post('/nom',  NominationController.create);
+app.delete('/nom/:id', NominationController.remove);
+app.patch('/nom/update/:id', NominationController.updateInfo);
+app.post('/nom/modify/:id', NominationController.modifyNomination);
 app.post('/loginAdmin', UserController.loginAdmin)
 app.post('/loginJoury', UserController.loginJoury)
 
-
+app.post('/setJoury', UserController.setJoury)
 
 
 const port = process.env.PORT || 3001
