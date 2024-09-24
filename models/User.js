@@ -24,6 +24,10 @@ const UserSchema = new mongoose.Schema({
     logo: String,
     avatar: String,
     city: String,
+    balance: {
+        type: Number,
+        default: 0
+    },
     applications: [{
         type: mongoose.Schema.Types.Mixed,
         portfolio: [String],

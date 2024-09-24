@@ -220,29 +220,310 @@ app.post('/api/uploadPreview/:id', upload.array('images', 10), async (req, res) 
 
 
 app.post('/createApplication', async (req, res) => {
-  const application_id = req.body.application_id
-  const id = req.body.id
+  const application_id = req.body.application_id;
+  const id = req.body.id;
+
   try {
+    // Попробуем обновить существующую заявку
     let user = await User.findOneAndUpdate(
       { _id: id, "applications.application_id": application_id },
-      { $set: { "applications.$.application_data": req.body.application } }, // Обновление, если есть такой application_id
+      { $set: { "applications.$.application_data": req.body.application } }, // Обновление существующей заявки
       { new: true }
     );
-    
+
+    const isNew = req.body.isNew
+
+    // Если заявка с таким application_id не найдена, создаём новую
     if (!user) {
-      // Если заявки с таким application_id нет, создаём новую заявку
       user = await User.findOneAndUpdate(
         { _id: id },
-        { $push: { applications: { application_id: application_id, application: req.body.application } } }, // Пушим новый объект заявки
+        { $push: { applications: { application_id: application_id, application: req.body.application } } }, // Добавляем новую заявку
         { new: true }
       );
     }
-    
 
-    res.json(user); // Отправляем обновленного пользователя в ответе
+    // Если пользователь найден и заявка обновлена/создана, уменьшаем баланс
+    if (user && isNew && user.balance > 0) {
+      user.balance -= 1; // Вычитаем 1 балл
+      await user.save();  // Сохраняем изменения в базе данных
+
+      res.json({ user, message: "Заявка успешно добавлена, баланс уменьшен" });
+    }
+    else if(user && !isNew){
+      res.json({ user, message: "Заявка успешно добавлена, баланс не уменьшен" });
+    }
+    else if (user && user.balance <= 0) {
+      res.status(400).json({ message: "Недостаточно баллов для создания заявки" });
+    } else {
+      res.status(404).json({ message: "Пользователь не найден" });
+    }
   } catch (error) {
     console.error('Ошибка при добавлении заявки:', error);
     res.status(500).json({ message: 'Ошибка при добавлении заявки' });
+  }
+});
+
+
+app.post('/updateApplication', async (req, res) => {
+  const application_id = req.body.application_id;
+  const id = req.body.id;
+
+  try {
+    // Найти пользователя и обновить заявку с указанным application_id
+    const user = await User.findOneAndUpdate(
+      { _id: id, "applications.application_id": application_id },
+      { $set: { "applications.$.application_data": req.body.application } }, // Обновление заявки
+      { new: true }
+    );
+
+    if (user) {
+      res.json({ user, message: "Заявка успешно обновлена" });
+    } else {
+      res.status(404).json({ message: "Заявка или пользователь не найдены" });
+    }
+  } catch (error) {
+    console.error('Ошибка при обновлении заявки:', error);
+    res.status(500).json({ message: 'Ошибка при обновлении заявки' });
+  }
+});
+
+
+
+app.post('/getApplication', async (req, res) => {
+  const application_id = req.body.application_id;
+  const id = req.body.id;
+
+  try {
+    let user = await User.findOne({ _id: id })
+    if(!user){
+      res.json({message: "Не найдена заявка"})
+    }else{
+      let application = await user.applications.find((elem) => elem.application_id == application_id)
+      if(application){
+        res.json(application)
+      }else{
+        res.json({message: "Не существует id данной заявки"})
+      }
+    }
+  } catch (error) {
+    console.log(error)
+  }
+})
+
+
+
+app.post('/auth/getAllInfo', async (req, res) => {
+  try {
+    const user = await User.findOne({ _id: req.body.userId });
+    const application_id = req.body.application_id;
+
+    if (!user) {
+      return res.json({ message: "Пользователь не найден" });
+    }
+
+    // Ищем заявку с нужным application_id
+    const application = user.applications.find(app => app.application_id == application_id);
+    console.log(application)
+
+    if (!application) {
+      return res.status(404).json({ message: "Заявка не найдена" });
+    }
+
+    // Создаем пустой объект для хранения всех ссылок
+    const allInfo = {};
+    // Конвертируем portfolio
+    if (application.portfolio && application.portfolio.length > 0) {
+      const portfolioUrls = await Promise.all(application.portfolio.map(async (key) => {
+        const url = await getSignedUrlForKey(key);
+        return url;
+      }));
+      allInfo.portfolio = portfolioUrls;
+    }
+
+    // Конвертируем previews
+    if (application.previews && application.previews.length > 0) {
+      const previewsUrls = await Promise.all(application.previews.map(async (key) => {
+        const url = await getSignedUrlForKey(key);
+        return url;
+      }));
+      allInfo.previews = previewsUrls;
+    }
+
+    // Конвертируем documents
+    if (application.documents && application.documents.length > 0) {
+      const documentsUrls = await Promise.all(application.documents.map(async (key) => {
+        const url = await getSignedUrlForKey(key);
+        return url;
+      }));
+      allInfo.documents = documentsUrls;
+    }
+
+    // Добавляем информацию о пользователе
+    allInfo.user = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar ? await getSignedUrlForKey(user.avatar) : null,
+      logo: user.logo ? await getSignedUrlForKey(user.logo) : null
+    };
+
+    // Генерация токена
+    const token = jwt.sign({ _id: user._id }, 'secret123', { expiresIn: "30d" });
+
+    // Отправляем ответ с полной информацией о пользователе и его заявке
+    res.json({
+      ...allInfo,
+      application_data: application.application_data, // Включаем данные заявки
+      token,
+    });
+
+  } catch (err) {
+    console.error('Ошибка при получении полной информации о пользователе:', err);
+    res.status(500).json({
+      message: "Ошибка при получении данных пользователя"
+    });
+  }
+});
+
+// Вспомогательная функция для генерации подписанной ссылки
+async function getSignedUrlForKey(key) {
+  const getObjectParams = {
+    Bucket: bucketName,
+    Key: key
+  };
+  const command = new GetObjectCommand(getObjectParams);
+  try {
+    const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    return url;
+  } catch (err) {
+    console.error('Ошибка при генерации подписанной ссылки:', err);
+    return null;
+  }
+}
+
+
+
+app.post('/auth/getAllInfo', async (req, res) => {
+  try {
+    const user = await User.findOne({ _id: req.body.userId });
+
+    if (!user) {
+      return res.json({ message: "Пользователь не найден" });
+    }
+
+    const getSignedUrlForKey = async (key) => {
+      const getObjectParams = {
+        Bucket: bucketName,
+        Key: key,
+      };
+      const command = new GetObjectCommand(getObjectParams);
+      return await getSignedUrl(s3, command, { expiresIn: 3600 });
+    };
+
+    // Конвертируем avatar
+    if (user.avatar) {
+      user.avatar = await getSignedUrlForKey(user.avatar);
+    }
+
+    // Конвертируем logo
+    if (user.logo) {
+      user.logo = await getSignedUrlForKey(user.logo);
+    }
+
+    // Конвертируем portfolio
+    if (user.portfolio && user.portfolio.length > 0) {
+      const portfolioUrls = await Promise.all(
+        user.portfolio.map(async (key) => await getSignedUrlForKey(key))
+      );
+      user.portfolio = portfolioUrls;
+    }
+
+    // Конвертируем documents
+    if (user.documents && user.documents.length > 0) {
+      const documentUrls = await Promise.all(
+        user.documents.map(async (key) => await getSignedUrlForKey(key))
+      );
+      user.documents = documentUrls;
+    }
+
+    // Генерация токена (если требуется)
+    const token = jwt.sign(
+      {
+        _id: user._id,
+      },
+      'secret123',
+      {
+        expiresIn: "30d",
+      }
+    );
+
+    // Удаляем ненужные данные перед отправкой пользователю
+    const { password, ...userData } = user._doc;
+
+    res.json({
+      ...userData,
+      token,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      message: "Ошибка при получении данных пользователя",
+    });
+  }
+});
+
+
+app.post('/auth/payment', async (req, res) => {
+  const userId = req.body.id;
+  const price = req.body.price;
+
+  try {
+    // Получаем пользователя из базы данных
+    let user = await User.findOne({ _id: userId });
+
+    // Если пользователь найден
+    if (user) {
+      // Обновляем баланс пользователя, прибавляя сумму оплаты
+      user.balance += price;
+
+      // Сохраняем изменения
+      await user.save();
+
+      // Отправляем успешный ответ
+      res.json({ message: "success", newBalance: user.balance });
+    } else {
+      // Если пользователь не найден, отправляем сообщение об ошибке
+      res.status(404).json({ message: "Пользователь не найден" });
+    }
+  } catch (error) {
+    // Логируем ошибку и отправляем сообщение об ошибке
+    console.log(error);
+    res.status(500).json({ message: "Не удалось провести оплату, свяжитесь с администрацией" });
+  }
+});
+
+
+app.post('/auth/getBalance', async (req, res) => {
+  const userId = req.body.id;
+
+  try {
+    // Получаем пользователя из базы данных
+    let user = await User.findOne({ _id: userId });
+
+    // Если пользователь найден
+    if (user && user.balance > 0) {
+      // Обновляем баланс пользователя, прибавляя сумму оплаты
+
+      // Отправляем успешный ответ
+      res.json({ message: "success", newBalance: user.balance });
+    } else {
+      // Если пользователь не найден, отправляем сообщение об ошибке
+      res.status(404).json({ message: "нет денег на балансе" });
+    }
+  } catch (error) {
+    // Логируем ошибку и отправляем сообщение об ошибке
+    console.log(error);
+    res.status(500).json({ message: "Не удалось провести оплату, свяжитесь с администрацией" });
   }
 });
 
@@ -335,8 +616,6 @@ app.post('/auth/getUser', async (req, res) => {
       });
   }
 });
-
-
 
 
 app.post('/auth/getUserByToken', handleValidationErrors, UserController.getUserByToken)

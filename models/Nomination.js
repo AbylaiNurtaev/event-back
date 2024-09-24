@@ -15,7 +15,8 @@ const NominationSchema = new mongoose.Schema({
         },
         percentage: {
             type: String,
-        }
+        },
+        moreText: String
     }],
     multipleSelection: {
         type: Boolean,
@@ -44,7 +45,8 @@ const NominationSchema = new mongoose.Schema({
         value: {
             type: String
         }
-    }]
+    }],
+    moreText: String
 
 })
 

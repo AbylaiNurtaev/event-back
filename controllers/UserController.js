@@ -274,6 +274,8 @@ export const getUserByToken = async (req, res) => {
 }
 
 
+
+
 export const loginAdmin = async (req, res) => {
     const id = req.body.id;
     const user = await User.findOne({ _id: id })

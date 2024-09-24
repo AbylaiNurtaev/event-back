@@ -42,6 +42,7 @@ export const create = async (req, res) => {
             nomination: req.body.nomination,
             category: req.body.category,
             information: req.body.information,
+            moreText: req.body.moreText
         });
 
         const post = await doc.save();
@@ -70,6 +71,7 @@ export const updateInfo = async (req, res) => {
                 nomination: req.body.nomination,
                 category: req.body.category,
                 information: req.body.information,
+                moreText: req.body.moreText
             },
             { new: true }
         );
