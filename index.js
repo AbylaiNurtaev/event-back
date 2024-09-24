@@ -518,7 +518,7 @@ app.post('/auth/getBalance', async (req, res) => {
       res.json({ message: "success", newBalance: user.balance });
     } else {
       // Если пользователь не найден, отправляем сообщение об ошибке
-      res.status(404).json({ message: "нет денег на балансе" });
+      res.json({ message: "no money" });
     }
   } catch (error) {
     // Логируем ошибку и отправляем сообщение об ошибке
