@@ -21,9 +21,13 @@ const UserSchema = new mongoose.Schema({
     vk: String,
     tiktok: String,
     verified: Boolean,
+    phone: String,
+    sait: String,
     logo: String,
     avatar: String,
     city: String,
+    portfolio: [String],
+    acceptedNominations: [String],
     balance: {
         type: Number,
         default: 0

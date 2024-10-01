@@ -11,28 +11,8 @@ import crypto from 'crypto';
 import Mailgen from 'mailgen';
 import User from './../models/User.js';
 
-export const updateInfo = async(req, res) => {
-    try {
-        const user = await User.findOneAndUpdate({ _id: req.body.userId },
-            {
-                // email: req.body.email,
-                company: req.body.company,
-                name: req.body.name,
-                // photo: req.body.photo,
-                nomination: req.body.nomination,
-                job: req.body.job,
-                about: req.body.about,
-            },
-            { new: true }
-        )
-        if(!user){
-            throw new Error("Пользователь не найден")
-        }
-        res.json(user)
-    } catch (error) {
-        console.log(error.message)
-    }
-}
+
+
 
 export const updateSocialInfo = async(req, res) => {
     try {
@@ -195,6 +175,27 @@ export const verifyOTP = async (req, res) => {
     }
 };
 
+
+
+export const getJouries = async (req, res) => {
+    try {
+      // Находим всех пользователей с ролью "joury" и указанным email
+      let users = await User.find(
+        { role: "joury" }
+      );
+  
+      res.json(users);
+      
+    } catch (error) {
+      res.status(500).json({
+        message: "Ошибка на сервере",
+      });
+    }
+  };
+
+
+
+  
 export const setJoury = async(req, res) => {
     try {
         const email = req.body.email;
@@ -209,6 +210,52 @@ export const setJoury = async(req, res) => {
             res.json({ message: "Вы успешно зарегестрировали Жюри!" })
         }else{
             res.json({ message: "Жюри ещё не зарегестрировался на сайте" })
+        }
+    } catch (error) {
+        res.status(404).json({
+            message: "Ошибка"
+        })
+    }
+}
+
+
+export const setJouryNomination = async(req, res) => {
+    try {
+        const email = req.body.email;
+        const acceptedNominations = req.body.acceptedNominations;
+        let user = await User.findOneAndUpdate(
+            {email},
+            {
+                acceptedNominations
+            },
+            { new: true }
+        )
+        if(user){
+            res.json({ message: "Вы успешно выставили разрешения для Жюри!" })
+        }else{
+            res.json({ message: "ПРоблемы с выставлением" })
+        }
+    } catch (error) {
+        res.status(404).json({
+            message: "Ошибка"
+        })
+    }
+}
+
+export const deleteJoury = async(req, res) => {
+    try {
+        const email = req.body.email;
+        let user = await User.findOneAndUpdate(
+            {email},
+            {
+                role: "user"
+            },
+            { new: true }
+        )
+        if(user){
+            res.json({ message: "Вы успешно удалили Жюри!" })
+        }else{
+            res.json({ message: "Нет такого пользователя" })
         }
     } catch (error) {
         res.status(404).json({

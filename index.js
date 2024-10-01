@@ -12,6 +12,7 @@ import sharp from 'sharp';
 import cors from 'cors'
 import * as UserController from './controllers/UserController.js'
 import * as NominationController from './controllers/NominationController.js'
+import * as DeadlineController from './controllers/DeadlineController.js'
 import jwt from 'jsonwebtoken'
 
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -216,7 +217,8 @@ app.post('/api/uploadPreview/:id', upload.array('images', 10), async (req, res) 
 });
 
 
-
+app.get('/getJouries', UserController.getJouries)
+app.post('/deleteJoury', UserController.deleteJoury)
 
 
 app.post('/createApplication', async (req, res) => {
@@ -402,8 +404,37 @@ async function getSignedUrlForKey(key) {
 }
 
 
+app.get('/getJouriesWithAvatars', async (req, res) => {
+  try {
+    // Находим всех пользователей с ролью "joury"
+    let users = await User.find({ role: "joury" });
 
-app.post('/auth/getAllInfo', async (req, res) => {
+    // Для каждого жюри генерируем подписанную ссылку на аватар
+    const usersWithAvatars = await Promise.all(
+      users.map(async (user) => {
+        // Предполагается, что путь к аватару хранится в user.avatarKey
+        const avatarUrl = await getSignedUrlForKey(user.avatar);
+
+        return {
+          ...user.toObject(), // Преобразуем mongoose объект в обычный объект
+          avatarUrl, // Добавляем ссылку на аватар
+        };
+      })
+    );
+
+    res.json(usersWithAvatars);
+
+  } catch (error) {
+    console.error('Ошибка при получении жюри:', error);
+    res.status(500).json({
+      message: "Ошибка на сервере",
+    });
+  }
+})
+
+
+
+app.post('/auth/getAllInfoPerson', async (req, res) => {
   try {
     const user = await User.findOne({ _id: req.body.userId });
 
@@ -538,7 +569,7 @@ app.post('/auth/getUser', async (req, res) => {
       }
 
       if (!['avatar', 'logo', 'portfolio', 'documents'].includes(type)) {
-        return res.status(400).json({ message: "Invalid type" });
+        return res.json(user);
       }
 
       // Если запрашиваем портфолио
@@ -673,10 +704,94 @@ app.post('/uploadFile/:id', upload.single('image'), async (req, res) => {
   }
 });
 
+const uploadFileToS3 = (file) => {
+  const uniqueFileName = `${Date.now()}-${Math.floor(Math.random() * 1000)}-${file.originalname}`;
+  const imageName = randomImageName();
+
+  const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: imageName, // Генерируем уникальное имя для файла
+      Body: file.buffer,
+      ContentType: file.mimetype,
+  };
+
+  return s3.upload(params).promise();
+};
+
+app.post('/auth/updateInfo', upload.array('portfolio', 50), async (req, res) => {
+  try {
+      const id = req.body.userId; // Получаем userId из тела запроса
+      const updateFields = {
+          company: req.body.company,
+          name: req.body.name,
+          nomination: req.body.nomination,
+          job: req.body.job,
+          about: req.body.about,
+          phone: req.body.phone,
+          sait: req.body.sait,
+          city: req.body.city,
+      };
+
+      // Flatten the array of arrays into a single array
+      const files = req.files ? req.files.flat() : []; // Проверяем, есть ли файлы
+
+      if (files.length > 0) {
+          const uploadedPortfolio = [];
+
+          for (let file of files) {
+              const buffer = await sharp(file.buffer).toBuffer(); // Обрабатываем изображение с помощью sharp
+              
+
+              const imageName = randomImageName();
+
+              const params = {
+                  Bucket: bucketName,
+                  Key: imageName, // Ключ для файла в S3
+                  Body: buffer,
+                  ContentType: file.mimetype,
+              };
+
+              const command = new PutObjectCommand(params);
+              await s3.send(command); // Загружаем файл в S3
+
+              uploadedPortfolio.push(imageName); // Добавляем имя загруженного файла в массив
+          }
+          console.log('priletelo',uploadedPortfolio)
+
+          // Добавляем URL портфолио в обновляемые поля
+          updateFields.portfolio = uploadedPortfolio;
+      }
+
+      // Обновляем информацию о пользователе
+      const user = await User.findOneAndUpdate(
+          { _id: id },
+          updateFields,
+          { new: true }
+      );
+
+      if (!user) {
+          return res.status(404).json({ message: "Пользователь не найден" });
+      }
+
+      res.json({ message: 'Информация успешно обновлена', user });
+  } catch (error) {
+      console.error('Ошибка обновления информации:', error);
+      res.status(500).json({ message: 'Ошибка обновления информации' });
+  }
+});
 
 
-app.post('/auth/updateInfo', UserController.updateInfo)
+
+
+
 app.post('/auth/updateSocialInfo', UserController.updateSocialInfo)
+
+
+
+
+app.get('/getDeadline', DeadlineController.getDeadline);
+app.post('/setDeadline', DeadlineController.setDeadline);
+
 
 
 app.get('/article', ArticleController.getAll);
@@ -692,6 +807,7 @@ app.patch('/nom/update/:id', NominationController.updateInfo);
 app.post('/nom/modify/:id', NominationController.modifyNomination);
 app.post('/loginAdmin', UserController.loginAdmin)
 app.post('/loginJoury', UserController.loginJoury)
+app.post('/setJouryNomination', UserController.setJouryNomination)
 
 app.post('/setJoury', UserController.setJoury)
 
