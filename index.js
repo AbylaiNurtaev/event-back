@@ -117,11 +117,12 @@ app.post('/api/uploadPortfolio/:id', upload.array('images', 50), async (req, res
   }
 });
 
-
 app.post('/api/uploadDocuments/:id', upload.array('documents', 50), async (req, res) => {
   try {
     const id = req.params.id;
     const application_id = req.body.application_id;
+
+    const documentNames = req.body.documentNames;
     
     const files = req.files; // Получаем массив файлов
     const uploadedDocuments = [];
@@ -161,6 +162,54 @@ app.post('/api/uploadDocuments/:id', upload.array('documents', 50), async (req, 
   } catch (error) {
     console.error('Ошибка загрузки документов:', error);
     res.status(500).json({ message: 'Ошибка загрузки документов' });
+  }
+});
+
+
+app.delete('/api/deleteDocument/:id/:application_id/:index', async (req, res) => {
+  try {
+    const { id, application_id, index } = req.params;
+
+    // Получаем пользователя с определенной заявкой
+    let user = await User.findOne({ _id: id, "applications.application_id": application_id });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь или заявка не найдены' });
+    }
+
+    // Находим заявку
+    const application = user.applications.find(app => app.application_id === application_id);
+
+    if (!application) {
+      return res.status(404).json({ message: 'Заявка не найдена' });
+    }
+
+    // Проверяем, что индекс документа существует
+    if (index < 0 || index >= application.documents.length) {
+      return res.status(400).json({ message: 'Неверный индекс документа' });
+    }
+
+    const documentName = application.documents[index];
+
+    // Удаляем документ из S3
+    const deleteParams = {
+      Bucket: bucketName,
+      Key: documentName,
+    };
+
+    const command = new DeleteObjectCommand(deleteParams);
+    await s3.send(command);
+
+    // Удаляем документ из массива документов
+    application.documents.splice(index, 1);
+
+    // Сохраняем обновления в базе данных
+    await user.save();
+
+    res.json({ message: 'Документ успешно удалён', documents: application.documents });
+  } catch (error) {
+    console.error('Ошибка удаления документа:', error);
+    res.status(500).json({ message: 'Ошибка удаления документа' });
   }
 });
 
@@ -267,28 +316,39 @@ app.post('/createApplication', async (req, res) => {
 
 
 app.post('/updateApplication', async (req, res) => {
-  const application_id = req.body.application_id;
-  const id = req.body.id;
+  const { application_id, id, application } = req.body;
 
   try {
-    // Найти пользователя и обновить заявку с указанным application_id
-    const user = await User.findOneAndUpdate(
+    // Найти пользователя с нужной заявкой
+    const user = await User.findOne({ _id: id, "applications.application_id": application_id });
+
+    if (!user) {
+      return res.status(404).json({ message: "Заявка или пользователь не найдены" });
+    }
+
+    // Обновление заявки
+    const updatedUser = await User.findOneAndUpdate(
       { _id: id, "applications.application_id": application_id },
-      { $set: { "applications.$.application_data": req.body.application } }, // Обновление заявки
+      { $set: { "applications.$.application_data": application } }, // Обновление конкретной заявки
       { new: true }
     );
 
-    if (user) {
-      res.json({ user, message: "Заявка успешно обновлена" });
-    } else {
-      res.status(404).json({ message: "Заявка или пользователь не найдены" });
-    }
+    res.json({ user: updatedUser, message: "Заявка успешно обновлена" });
   } catch (error) {
     console.error('Ошибка при обновлении заявки:', error);
     res.status(500).json({ message: 'Ошибка при обновлении заявки' });
   }
 });
 
+
+app.get('/getAllUsers', async(req, res) => {
+  try {
+    let users = await User.find()
+    res.json(users)
+  } catch (error) {
+    console.log(error)
+  }
+})
 
 
 app.post('/getApplication', async (req, res) => {
@@ -718,9 +778,50 @@ const uploadFileToS3 = (file) => {
   return s3.upload(params).promise();
 };
 
+app.post('/deleteImageFromPortfolio', async (req, res) => {
+  try {
+    const idx = req.body.idx;
+    const id = req.body.userId;
+
+    if (idx !== undefined && id) {
+      const user = await User.findById(id);
+      if (!user) {
+        return res.status(404).json({ message: "Пользователь не найден" });
+      }
+
+      // Проверка, что индекс находится в пределах массива
+      if (idx >= 0 && idx < user.portfolio.length) {
+        // Удаляем элемент по индексу
+        user.portfolio.splice(idx, 1);
+
+        // Сохраняем изменения
+        await user.save();
+
+        return res.status(200).json({ message: "Изображение успешно удалено" });
+      } else {
+        return res.status(400).json({ message: "Неверный индекс" });
+      }
+    } else {
+      return res.status(400).json({ message: "Некорректные данные" });
+    }
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({ message: "Ошибка сервера" });
+  }
+});
+
+
 app.post('/auth/updateInfo', upload.array('portfolio', 50), async (req, res) => {
   try {
       const id = req.body.userId; // Получаем userId из тела запроса
+
+      // Извлекаем текущие данные пользователя
+      const user = await User.findById(id);
+      if (!user) {
+          return res.status(404).json({ message: "Пользователь не найден" });
+      }
+
+      // Собираем обновляемые поля
       const updateFields = {
           company: req.body.company,
           name: req.body.name,
@@ -732,16 +833,20 @@ app.post('/auth/updateInfo', upload.array('portfolio', 50), async (req, res) => 
           city: req.body.city,
       };
 
-      // Flatten the array of arrays into a single array
+      // Получаем файлы из запроса
       const files = req.files ? req.files.flat() : []; // Проверяем, есть ли файлы
+      console.log("кол-во файлов: ", files.length);
+      console.log("id: ", id);
+      console.log("files: ", req.files);
+      console.log("portfolio: ", req.body.portfolio);
 
+      // Если файлы есть, добавляем их к существующему портфолио
       if (files.length > 0) {
           const uploadedPortfolio = [];
 
+          // Загружаем новые файлы в S3 и сохраняем их имена
           for (let file of files) {
               const buffer = await sharp(file.buffer).toBuffer(); // Обрабатываем изображение с помощью sharp
-              
-
               const imageName = randomImageName();
 
               const params = {
@@ -756,24 +861,25 @@ app.post('/auth/updateInfo', upload.array('portfolio', 50), async (req, res) => 
 
               uploadedPortfolio.push(imageName); // Добавляем имя загруженного файла в массив
           }
-          console.log('priletelo',uploadedPortfolio)
+          console.log('priletelo', uploadedPortfolio);
 
-          // Добавляем URL портфолио в обновляемые поля
-          updateFields.portfolio = uploadedPortfolio;
+          // Добавляем новые файлы к существующему портфолио
+          const currentPortfolio = user.portfolio || []; // Получаем текущее портфолио
+          updateFields.portfolio = [...currentPortfolio, ...uploadedPortfolio]; // Добавляем новые файлы
       }
 
       // Обновляем информацию о пользователе
-      const user = await User.findOneAndUpdate(
+      const updatedUser = await User.findOneAndUpdate(
           { _id: id },
           updateFields,
           { new: true }
       );
 
-      if (!user) {
+      if (!updatedUser) {
           return res.status(404).json({ message: "Пользователь не найден" });
       }
 
-      res.json({ message: 'Информация успешно обновлена', user });
+      res.json({ message: 'Информация успешно обновлена', user: updatedUser });
   } catch (error) {
       console.error('Ошибка обновления информации:', error);
       res.status(500).json({ message: 'Ошибка обновления информации' });

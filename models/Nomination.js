@@ -38,14 +38,14 @@ const NominationSchema = new mongoose.Schema({
             type: String
         }
     }],
-    additionalFields: [{
+    additionalFields: [[{
         key: {
             type: String
         },
         value: {
             type: String
         }
-    }],
+    }]],
     moreText: String
 
 })
