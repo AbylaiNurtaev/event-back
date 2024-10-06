@@ -220,6 +220,59 @@ app.delete('/api/deleteDocument/:id/:application_id/:index', async (req, res) =>
   }
 });
 
+app.delete('/api/deletePortfolio/:id/:application_id/:index', async (req, res) => {
+  try {
+    const { id, application_id, index } = req.params;
+    console.log(id, application_id, index)
+
+    // Находим пользователя с заявкой
+    let user = await User.findOne({ _id: id, "applications.application_id": application_id });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Пользователь или заявка не найдены' });
+    }
+
+    // Находим нужную заявку
+    const application = user.applications.find(app => app.application_id === application_id);
+
+    if (!application) {
+      return res.status(404).json({ message: 'Заявка не найдена' });
+    }
+
+    // Проверяем, что индекс элемента в портфолио существует
+    if (index < 0 || index >= application.portfolio.length) {
+      return res.status(400).json({ message: 'Неверный индекс элемента портфолио' });
+    }
+
+    const portfolioItem = application.portfolio[index];
+
+    // Удаляем элемент портфолио (если нужно удалить из S3)
+    const deleteParams = {
+      Bucket: bucketName,
+      Key: portfolioItem, // Здесь предполагается, что в `portfolioItem` содержится имя файла
+    };
+
+    const command = new DeleteObjectCommand(deleteParams);
+    await s3.send(command);
+
+    // Удаляем элемент из массива портфолио
+    application.portfolio.splice(index, 1);
+
+    // Сохраняем обновлённый массив портфолио в базе данных
+    await User.findOneAndUpdate(
+      { _id: id, "applications.application_id": application_id },
+      { $set: { "applications.$.portfolio": application.portfolio } }, // Обновляем портфолио в нужной заявке
+      { new: true }
+    );
+
+    res.json({ message: 'Элемент портфолио успешно удалён', portfolio: application.portfolio });
+  } catch (error) {
+    console.error('Ошибка удаления элемента портфолио:', error);
+    res.status(500).json({ message: 'Ошибка удаления элемента портфолио' });
+  }
+});
+
+
 
 
 
