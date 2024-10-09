@@ -111,6 +111,7 @@ export const modifyNomination = async (req, res) => {
                 videosText: req.body.videosText,
                 imagesText: req.body.imagesText,
                 docsText: req.body.docsText,
+                par: req.body.par,
                 additionalFields: req.body.additionalFields,
             },
             { new: true }

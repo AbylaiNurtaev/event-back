@@ -6,7 +6,7 @@ const NominationSchema = new mongoose.Schema({
         required: true
     },
     category: {
-        type: String,
+        type: [String],
         required: true
     },
     information: [{
@@ -70,6 +70,10 @@ const NominationSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    par: {
+        type: String,
+        default: ''
+    }, 
     moreText: String
 
 })
