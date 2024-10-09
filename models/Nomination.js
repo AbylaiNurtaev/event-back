@@ -19,7 +19,7 @@ const NominationSchema = new mongoose.Schema({
         moreText: String
     }],
     multipleSelection: {
-        type: Boolean,
+        type: String,
         default: false
     },
     nameTitle: {
@@ -46,6 +46,30 @@ const NominationSchema = new mongoose.Schema({
             type: String
         }
     }]],
+    images: {
+        type: Boolean,
+        default: true
+    },
+    docs: {
+        type: Boolean,
+        default: true
+    },
+    videos: {
+        type: Boolean,
+        default: true
+    },
+    imagesText: {
+        type: String,
+        default: ''
+    },
+    docsText: {
+        type: String,
+        default: ''
+    },
+    videosText: {
+        type: String,
+        default: ''
+    },
     moreText: String
 
 })

@@ -220,6 +220,7 @@ app.delete('/api/deleteDocument/:id/:application_id/:index', async (req, res) =>
   }
 });
 
+
 app.delete('/api/deletePortfolio/:id/:application_id/:index', async (req, res) => {
   try {
     const { id, application_id, index } = req.params;
