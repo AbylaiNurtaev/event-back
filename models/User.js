@@ -26,6 +26,7 @@ const UserSchema = new mongoose.Schema({
     logo: String,
     avatar: String,
     city: String,
+    specialization: String,
     portfolio: [String],
     acceptedNominations: [String],
     balance: {

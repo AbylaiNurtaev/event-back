@@ -946,6 +946,7 @@ app.post('/auth/updateInfo', upload.array('portfolio', 50), async (req, res) => 
           phone: req.body.phone,
           sait: req.body.sait,
           city: req.body.city,
+          specialization: req.body.specialization
       };
 
       // Получаем файлы из запроса
