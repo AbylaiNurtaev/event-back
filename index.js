@@ -809,6 +809,8 @@ app.post('/auth/getUser', async (req, res) => {
       });
 
       const { ...userData } = user._doc;
+      console.log(token)
+      
 
       res.json({
           ...userData,
