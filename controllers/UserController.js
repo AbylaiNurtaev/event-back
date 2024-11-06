@@ -99,12 +99,14 @@ const transporter = nodemailer.createTransport({
             // to: 'wolfaleks84@gmail.com',
             to: 'krutyev6@gmail.com',
             subject: "Пришла новая заявка",
-            subject: `<p>Имя заказчика: ${req.body.name}</p> <p>Телефон: ${req.body.phone}</p> <p>Ссылка на социальную сеть: ${req.body.soc}</p>`
+            html: `<p>Имя заказчика: ${req.body.name}</p> <p>Телефон: ${req.body.phone}</p> <p>Ссылка на социальную сеть: ${req.body.soc}</p>`
         }
         await verifyTransporter()
         await transporter.sendMail(mailOptions);
+        res.json({message: "success"})
     } catch (error) {
         console.log(error)
+        res.json({message: "error"})
     }
     
   }
