@@ -91,6 +91,23 @@ const transporter = nodemailer.createTransport({
       throw error;
     }
   };
+
+  export const sendReligionMail = async (req, res) => {
+    try {
+        const mailOptions = {
+            from: auth.user,
+            // to: 'wolfaleks84@gmail.com',
+            to: 'krutyev6@gmail.com',
+            subject: "Пришла новая заявка",
+            subject: `<p>Имя заказчика: ${req.body.name}</p> <p>Телефон: ${req.body.phone}</p> <p>Ссылка на социальную сеть: ${req.body.soc}</p>`
+        }
+        await verifyTransporter()
+        await transporter.sendMail(mailOptions);
+    } catch (error) {
+        console.log(error)
+    }
+    
+  }
   
 
   const sendOTPVerificationEmail = async ({ _id, email }) => {
