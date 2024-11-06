@@ -67,17 +67,19 @@ export const register = async (req, res) => {
   
 
 const auth = {
-    user: process.env.USER,
+    user: process.env.USER1,
     pass: process.env.PASS
 }
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
+    port: 587,
+
     auth: {
       user: auth.user,
       pass: auth.pass,
     },
-    secure: true, // Используем безопасное соединение
+    secure: false, // Используем безопасное соединение
   });
 
   const verifyTransporter = async () => {
@@ -102,7 +104,27 @@ const transporter = nodemailer.createTransport({
         from: auth.user, // используем email, указанный в auth
         to: email, // email получателя
         subject: 'Verify Your Email',
-        html: `<p>Ваш код верификации: ${otp}</p>`,
+        html: `<p>Ваш код верификации: ${otp}</p> 
+<p>
+Поздравляем! Вы теперь на шаг ближе к WEDS RATING🔥 <br>
+Благодарим за регистрацию на сайте WEDS. <br>
+Теперь вы официально стали частью нашего сообщества, и мы рады поздравить вас с этим важным шагом.<br>
+
+Что нужно сделать прямо сейчас?<br>
+1. Перейти по ссылке, зарегистрироваться в личном кабинете и оплатить участие в рейтинге
+👉 (weds.kz)<br>
+2. Вступить в закрытый Telegram-канал, где мы будем делиться полезной информацией, отвечать на вопросы и помогать вам на пути к победе. <br>
+Этот канал — уникальная возможность стать частью сообщества самых крутых и смелых специалистов индустрии:  <br>
+👉 https://t.me/+vx2atrYrlfs0ZTZi<br>
+Смелость всегда вознаграждается. <br><br>
+
+Теперь дело за вами — блестите, удивляйте и, главное, не забудьте сделать это с улыбкой😉<br>
+Мы уже болеем за вас и уверены, что будет огонь.<br><br>
+
+С уважением,<br>  
+Команда WEDS
+</p>
+`,
       };
   
       // Хешируем OTP перед сохранением в базу данных
@@ -342,11 +364,50 @@ export const loginJoury = async (req, res) => {
     const user = await User.findOne({ _id: id })
 
     if(user && user.role == "joury"){
-        res.json("success")
+        res.json({
+            status: "success",
+            ...user._doc
+        })
     }else{
         return res.status(500).json({
             message: "Не получилось авторизоваться",
         });
     }
 }
+
+export const accessApplication = async (req, res) => {
+    const { userId, applicationId } = req.body;
+
+    try {
+        const user = await User.findOne({ _id: userId });
+        if (user) {
+            const application = user.applications.find((elem) => elem.application_id == applicationId);
+
+            if (application) {
+                console.log("Current accepted value:", application.accepted);
+
+                // Toggle the `accepted` value
+                application.accepted = !application.accepted;
+
+                console.log("New accepted value:", application.accepted);
+
+                // Mark the `applications` array as modified to ensure Mongoose saves it
+                user.markModified("applications");
+
+                // Save the user document to persist changes
+                await user.save();
+
+                res.json({ message: "Application status updated", application });
+            } else {
+                res.status(404).json({ message: "Application not found" });
+            }
+        } else {
+            res.status(404).json({ message: "User not found" });
+        }
+    } catch (error) {
+        console.log(error.message);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
 

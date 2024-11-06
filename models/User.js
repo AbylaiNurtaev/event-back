@@ -37,6 +37,10 @@ const UserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.Mixed,
         portfolio: [String],
         previews: [String],
+        accepted: {
+            type: String,
+            default: "false"
+        },
         application_id: {
             type: String,
             required: true
