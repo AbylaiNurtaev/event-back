@@ -108,7 +108,7 @@ const transporter = nodemailer.createTransport({
         const mailOptions = {
             from: auth.user,
             // to: 'wolfaleks84@gmail.com',
-            to: 'krutyev6@gmail.com',
+            to: 'wolfaleks84@gmail.com',
             subject: "Пришла новая заявка",
             html: `<p>Имя заказчика: ${name}</p> <p>Телефон: ${phone}</p> <p>Ссылка на социальную сеть: ${soc}</p>`
         }
