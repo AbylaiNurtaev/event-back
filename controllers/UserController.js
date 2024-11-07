@@ -92,33 +92,33 @@ const transporter = nodemailer.createTransport({
     }
   };
 
-//   export const sendReligionMail = async(req, res) => {
-//     try {
-//         const { name, phone, soc } = req.body;
-//         await sendReligion(name, phone, soc)
-//         res.json({message: 'success'})
-//     } catch (error) {
-//         console.log(error)
-//     }
-//   }
+  export const sendReligionMail = async(req, res) => {
+    try {
+        const { name, phone, soc } = req.body;
+        await sendReligion(name, phone, soc)
+        res.json({message: 'success'})
+    } catch (error) {
+        console.log(error)
+    }
+  }
 
-//   const sendReligion = async ({name, phone, soc}) => {
-//     console.log(name, phone, soc)
-//     try {
-//         const mailOptions = {
-//             from: auth.user,
-//             // to: 'wolfaleks84@gmail.com',
-//             to: 'krutyev6@gmail.com',
-//             subject: "Пришла новая заявка",
-//             html: `<p>Имя заказчика: ${name}</p> <p>Телефон: ${phone}</p> <p>Ссылка на социальную сеть: ${soc}</p>`
-//         }
-//         await verifyTransporter()
-//         await transporter.sendMail(mailOptions);
-//     } catch (error) {
-//         console.log(error)
-//     }
+  const sendReligion = async ({name, phone, soc}) => {
+    console.log(name, phone, soc)
+    try {
+        const mailOptions = {
+            from: auth.user,
+            // to: 'wolfaleks84@gmail.com',
+            to: 'krutyev6@gmail.com',
+            subject: "Пришла новая заявка",
+            html: `<p>Имя заказчика: ${name}</p> <p>Телефон: ${phone}</p> <p>Ссылка на социальную сеть: ${soc}</p>`
+        }
+        await verifyTransporter()
+        await transporter.sendMail(mailOptions);
+    } catch (error) {
+        console.log(error)
+    }
     
-//   }
+  }
   
 
   const sendOTPVerificationEmail = async ({ _id, email }) => {
