@@ -383,7 +383,7 @@ app.delete('/api/removePreview/:id/:application_id/:index', async (req, res) => 
 
 app.get('/getJouries', UserController.getJouries)
 app.post('/deleteJoury', UserController.deleteJoury)
-app.post('/sendReligionMail', UserController.sendReligionMail)
+// app.post('/sendReligionMail', UserController.sendReligionMail)
 
 
 app.post('/createApplication', async (req, res) => {
