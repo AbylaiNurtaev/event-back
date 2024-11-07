@@ -102,7 +102,7 @@ const transporter = nodemailer.createTransport({
     }
   }
 
-  const sendReligion = async ({name, phone, soc}) => {
+  const sendReligion = async (name, phone, soc) => {
     console.log(name, phone, soc)
     try {
         const mailOptions = {
