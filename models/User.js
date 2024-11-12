@@ -27,6 +27,17 @@ const UserSchema = new mongoose.Schema({
     avatar: String,
     city: String,
     specialization: String,
+    jouryCounter: {
+        type: Number,
+        default: 0
+    },
+    jouryRate: [{
+        name: String,
+        rating: Number,
+        category: String,
+        projectId: Number,
+        jouryId: String
+    }],
     portfolio: [String],
     acceptedNominations: [String],
     balance: {

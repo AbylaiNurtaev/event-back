@@ -561,6 +561,7 @@ app.post('/auth/getAllInfo', async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      about: user.about,
       avatar: user.avatar ? await getSignedUrlForKey(user.avatar) : null,
       logo: user.logo ? await getSignedUrlForKey(user.logo) : null
     };
@@ -1054,6 +1055,12 @@ app.post('/setJouryNomination', UserController.setJouryNomination)
 
 app.post('/setJoury', UserController.setJoury)
 
+
+app.post('/addCriterion', NominationController.addCriterion)
+app.post('/editCriterion', NominationController.editCriterion)
+app.post('/deleteCriterion', NominationController.deleteCriterion)
+app.post('/users/jury-ratings', UserController.saveJuryRating);
+app.get('/users/:userId/jury-ratings', UserController.getJuryRatings);
 
 const port = process.env.PORT || 3001
 

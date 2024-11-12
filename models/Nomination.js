@@ -74,6 +74,24 @@ const NominationSchema = new mongoose.Schema({
         type: String,
         default: ''
     }, 
+    criteria: {
+        type: [
+            {
+                main: [
+                    {
+                        name: String,
+                        grade: Number
+                    }
+                ],
+                additional: [
+                    {
+                        name: String,
+                        grade: Number
+                    }
+                ]
+            }
+        ]
+    },
     moreText: String
 
 })
