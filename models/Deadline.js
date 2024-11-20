@@ -17,7 +17,14 @@ const DeadlineSchema = new mongoose.Schema({
         type: String,
         required: true
 
-    }
+    },
+    
+    dateJoury: {
+        type: String,
+        required: true
+
+    },
+    
     
 }, {
     timestamps: true // Добавляет поля createdAt и updatedAt

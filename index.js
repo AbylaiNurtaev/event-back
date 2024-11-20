@@ -19,6 +19,8 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import checkAuth from './utils/checkAuth.js';
 import { ArticleController } from './controllers/index.js';
+import * as JournalController from './controllers/JournalController.js'
+
 import checkAdmin from './utils/checkAdmin.js';
 
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -1061,6 +1063,12 @@ app.post('/editCriterion', NominationController.editCriterion)
 app.post('/deleteCriterion', NominationController.deleteCriterion)
 app.post('/users/jury-ratings', UserController.saveJuryRating);
 app.get('/users/:userId/jury-ratings', UserController.getJuryRatings);
+
+
+app.post('/createJournal', JournalController.createJournal)
+app.get('/getJournal', JournalController.getLatestJournal)
+app.post('/updateJournal', JournalController.updateJournal)
+app.post('/deleteJournal', JournalController.deleteJournal)
 
 const port = process.env.PORT || 3001
 

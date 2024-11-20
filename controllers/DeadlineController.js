@@ -15,7 +15,7 @@ export const getDeadline = async (req, res) => {
 
 export const setDeadline = async (req, res) => {
     try {
-        const { deadline, deadline2, month, date } = req.body;
+        const { deadline, deadline2, month, date, dateJoury } = req.body;
 
         if (!deadline) {
             return res.status(400).json({
@@ -27,7 +27,8 @@ export const setDeadline = async (req, res) => {
             deadline,
             deadline2,
             month,
-            date
+            date,
+            dateJoury
         });
 
         // Сохраняем данные и проверяем результат
