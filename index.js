@@ -25,6 +25,7 @@ import checkAdmin from './utils/checkAdmin.js';
 
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import User from './models/User.js';
+import Journal from './models/Journal.js';
 
 const bucketName = process.env.BUCKET_NAME
 const bucketRegion = process.env.BUCKET_REGION
@@ -906,6 +907,50 @@ app.post('/uploadFile/:id', upload.single('image'), async (req, res) => {
   }
 });
 
+
+app.post('/uploadArticlePhoto/:id', upload.single('image'), async (req, res) => {
+  const articleId = req.params.id;
+
+  const oldUser = await Journal.findOne({ _id: articleId });
+  const oldImage = oldUser.img;
+
+  // Удаляем старое изображение, если оно есть
+  if(oldImage && oldImage.length >= 1){
+    const commandDelete = new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: oldImage
+    });
+    await s3.send(commandDelete);
+  }
+
+  const buffer = await sharp(req.file.buffer).toBuffer();
+  const imageName = randomImageName();
+
+  const params = {
+    Bucket: bucketName,
+    Key: imageName,
+    Body: buffer,
+    ContentType: req.file.mimetype
+  };
+
+  const command = new PutObjectCommand(params);
+  await s3.send(command);
+
+  try {
+      const post = await Journal.findOneAndUpdate({ _id: articleId }, {
+        img: imageName // Динамическое обновление
+      }, { new: true });
+
+      if (!post) {
+        throw new Error("Не получилось загрузить фотку");
+      }
+      res.json(post);
+  } catch (error) {
+      console.log(error.message);
+      res.status(500).json({ message: "Ошибка при обновлении изображения" });
+  }
+});
+
 const uploadFileToS3 = (file) => {
   const uniqueFileName = `${Date.now()}-${Math.floor(Math.random() * 1000)}-${file.originalname}`;
   const imageName = randomImageName();
@@ -1067,6 +1112,54 @@ app.get('/users/:userId/jury-ratings', UserController.getJuryRatings);
 
 app.post('/createJournal', JournalController.createJournal)
 app.get('/getJournal', JournalController.getLatestJournal)
+app.get('/getJournals', async(req, res) => {
+  try {
+    // Находим самую свежую запись, отсортированную по дате создания
+    const id = req.params.id;
+    const latestFaq = await Journal.find();
+
+    if (!latestFaq) {
+      return res.status(404).json({ message: "FAQ не найден." });
+    }
+
+    for(let i = 0; i < latestFaq.length; i++){
+      if(latestFaq[i].img && latestFaq[i].img.length >= 1){
+        const img = await getSignedUrlForKey(latestFaq[i].img);
+        latestFaq[i].img = img
+      }
+    }
+
+    res.status(200).json(latestFaq);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Произошла ошибка при получении FAQ" });   
+}
+}
+)
+
+app.get('/getJournalById/:id', async(req, res) => {
+  try {
+    // Находим самую свежую запись, отсортированную по дате создания
+    const id = req.params.id;
+    const latestFaq = await Journal.findOne({_id: id});
+
+    if (!latestFaq) {
+      return res.status(404).json({ message: "FAQ не найден." });
+    }
+
+    if(latestFaq.img && latestFaq.img.length >= 1){
+      const img = await getSignedUrlForKey(latestFaq.img);
+      latestFaq.img = img
+    }
+
+    res.status(200).json(latestFaq);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Произошла ошибка при получении FAQ" });   
+}
+}
+)
+
 app.post('/updateJournal', JournalController.updateJournal)
 app.post('/deleteJournal', JournalController.deleteJournal)
 
