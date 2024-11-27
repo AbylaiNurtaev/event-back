@@ -444,7 +444,7 @@ export const accessApplication = async (req, res) => {
 
 
 export const saveJuryRating = async (req, res) => {
-    const { userId, ratingData, graded } = req.body; // Ожидается, что ratingData — это массив с объектами рейтингов
+    const { userId, ratingData, graded, applicationId } = req.body; // Ожидается, что ratingData — это массив с объектами рейтингов
 
     try {
         const user = await User.findById(userId);
@@ -456,27 +456,40 @@ export const saveJuryRating = async (req, res) => {
                     rate.name === newRating.name &&
                     rate.category === newRating.category &&
                     rate.projectId === newRating.projectId &&
-                    rate.jouryId === newRating.jouryId
+                    rate.jouryId === newRating.jouryId &&
+                    rate.applicationId == newRating.applicationId
             );
 
             if (existingRating) {
                 existingRating.rating = newRating.rating; // Обновляем существующий рейтинг
-            } else {      
+                existingRating.applicationId = applicationId; // Устанавливаем applicationId
+            } else {
+                newRating.applicationId = applicationId; // Устанавливаем applicationId
                 user.jouryRate.push(newRating); // Добавляем новый рейтинг
             }
         }
-        
+
+        // Гарантируем, что у всех объектов в jouryRate есть applicationId
+        user.jouryRate = user.jouryRate.map((rate) => ({
+            ...rate,
+            applicationId: rate.applicationId || applicationId, // Добавляем applicationId, если его нет
+        }));
+
         const userJoury = await User.findOne({ _id: ratingData[0].jouryId });
         if (graded == false && userJoury) {
-            userJoury.jouryCounter += 1
+            userJoury.jouryCounter += 1;
             await userJoury.save();
         }
+
+        console.log(user);
         await user.save();
         res.status(200).json({ message: "Рейтинги успешно обновлены", jouryRate: user.jouryRate });
     } catch (error) {
         res.status(500).json({ message: "Не удалось сохранить рейтинги", error });
     }
 };
+
+
 
 
 

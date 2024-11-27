@@ -1,15 +1,16 @@
 import Journal from "../models/Journal.js";
-
+import mongoose from "mongoose";
 // Функция для создания нового FAQ
 export const createJournal = async (req, res) => {
   try {
-    const { title, par, text } = req.body;
+    const { title, par, text, img } = req.body;
 
     // Создаем новый FAQ и сохраняем его в базе данных
     const newFaq = new Journal({
       title,
       par, // Дополнительный вопрос (если есть)
-      text
+      text,
+      img
     });
 
     await newFaq.save();
@@ -41,25 +42,31 @@ export const getLatestJournal = async (req, res) => {
 // Функция для обновления последнего FAQ
 export const updateJournal = async (req, res) => {
   try {
-    const { title, par, text } = req.body;
+    const { id, title, par, text } = req.body;
 
-    // Находим и обновляем самую свежую запись
-    const updatedFaq = await Journal.findOneAndUpdate(
-      { _id: req.body.id }, // Пустой фильтр, чтобы найти первую запись
-      { title, par, text }, // Новые данные
-      { new: true } // Возвращаем обновлённую запись
-    );
-
-    if (!updatedFaq) {
-      return res.status(404).json({ message: "FAQ не найден для обновления." });
+    // Проверяем, является ли ID валидным ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Некорректный формат ID' });
     }
 
-    res.status(200).json({ message: "FAQ успешно обновлен!", updatedFaq });
+    if (!title || !text) {
+      return res.status(400).json({ error: 'Необходимо указать title и text' });
+    }
+
+    // Находим и обновляем или создаём новую запись
+    const updatedFaq = await Journal.findOneAndUpdate(
+      { _id: id },
+      { title, par, text },
+      { new: true, upsert: true } // upsert создаёт запись, если её нет
+    );
+
+    res.status(200).json({ message: 'Журнал успешно обновлен!', updatedFaq });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Произошла ошибка при обновлении FAQ" });
+    res.status(500).json({ error: 'Произошла ошибка при обновлении журнала' });
   }
 };
+
 
 
 export const deleteJournal = async (req, res) => {

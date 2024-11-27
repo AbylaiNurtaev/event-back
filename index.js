@@ -4,6 +4,8 @@ import chalk from 'chalk';
 import handleValidationErrors from './utils/handleValidationErrors.js';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import path from 'path';
+import fs from 'fs'
 dotenv.config();
 import crypto from 'crypto'
 
@@ -26,6 +28,7 @@ import checkAdmin from './utils/checkAdmin.js';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import User from './models/User.js';
 import Journal from './models/Journal.js';
+import { fileURLToPath } from 'url';
 
 const bucketName = process.env.BUCKET_NAME
 const bucketRegion = process.env.BUCKET_REGION
@@ -40,6 +43,7 @@ const s3 = new S3Client({
   },
   region: bucketRegion
 })
+
 
 
 
@@ -119,6 +123,12 @@ app.post('/api/uploadPortfolio/:id', upload.array('images', 50), async (req, res
     res.status(500).json({ message: 'Ошибка загрузки фотографий' });
   }
 });
+
+
+
+
+
+
 
 
 app.post('/api/uploadDocuments/:id', upload.array('documents', 50), async (req, res) => {
@@ -911,45 +921,55 @@ app.post('/uploadFile/:id', upload.single('image'), async (req, res) => {
 app.post('/uploadArticlePhoto/:id', upload.single('image'), async (req, res) => {
   const articleId = req.params.id;
 
-  const oldUser = await Journal.findOne({ _id: articleId });
-  const oldImage = oldUser.img;
-
-  // Удаляем старое изображение, если оно есть
-  if(oldImage && oldImage.length >= 1){
-    const commandDelete = new DeleteObjectCommand({
-      Bucket: bucketName,
-      Key: oldImage
-    });
-    await s3.send(commandDelete);
-  }
-
-  const buffer = await sharp(req.file.buffer).toBuffer();
-  const imageName = randomImageName();
-
-  const params = {
-    Bucket: bucketName,
-    Key: imageName,
-    Body: buffer,
-    ContentType: req.file.mimetype
-  };
-
-  const command = new PutObjectCommand(params);
-  await s3.send(command);
-
   try {
-      const post = await Journal.findOneAndUpdate({ _id: articleId }, {
-        img: imageName // Динамическое обновление
-      }, { new: true });
+    // Проверяем, является ли ID валидным ObjectId
+    if (!mongoose.Types.ObjectId.isValid(articleId)) {
+      return res.status(400).json({ error: 'Некорректный формат ID' });
+    }
 
-      if (!post) {
-        throw new Error("Не получилось загрузить фотку");
+    // Находим запись в базе
+    const oldUser = await Journal.findOne({ _id: articleId });
+
+    // Если запись существует, проверяем и удаляем старое изображение
+    if (oldUser) {
+      const oldImage = oldUser.img;
+      if (oldImage && oldImage.length >= 1) {
+        const commandDelete = new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: oldImage,
+        });
+        await s3.send(commandDelete);
       }
-      res.json(post);
+    }
+
+    // Загружаем новое изображение
+    const buffer = await sharp(req.file.buffer).toBuffer();
+    const imageName = randomImageName();
+
+    const params = {
+      Bucket: bucketName,
+      Key: imageName,
+      Body: buffer,
+      ContentType: req.file.mimetype,
+    };
+
+    const command = new PutObjectCommand(params);
+    await s3.send(command);
+
+    // Обновляем запись или создаем новую
+    const post = await Journal.findOneAndUpdate(
+      { _id: articleId },
+      { img: imageName },
+      { new: true, upsert: true } // upsert создаёт запись, если её нет
+    );
+
+    res.json(post);
   } catch (error) {
-      console.log(error.message);
-      res.status(500).json({ message: "Ошибка при обновлении изображения" });
+    console.log(error.message);
+    res.status(500).json({ message: 'Ошибка при обновлении изображения' });
   }
 });
+
 
 const uploadFileToS3 = (file) => {
   const uniqueFileName = `${Date.now()}-${Math.floor(Math.random() * 1000)}-${file.originalname}`;
@@ -1162,6 +1182,41 @@ app.get('/getJournalById/:id', async(req, res) => {
 
 app.post('/updateJournal', JournalController.updateJournal)
 app.post('/deleteJournal', JournalController.deleteJournal)
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+
+app.post('/uploadImage', upload.single('image'), (req, res) => {
+  try {
+      if (!req.file) {
+          return res.status(400).json({ success: false, message: 'No file uploaded!' });
+      }
+
+      // URL загруженного файла
+      const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+
+      res.json({
+          success: true,
+          fileUrl,
+      });
+  } catch (err) {
+      console.error(err);
+      res.status(500).json({ success: false, message: 'Server error!' });
+  }
+});
+
+
+// Раздача статических файлов (загруженные изображения)
+app.use('/uploads', express.static(uploadDir));
+
+
 
 const port = process.env.PORT || 3001
 

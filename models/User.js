@@ -36,7 +36,8 @@ const UserSchema = new mongoose.Schema({
         rating: Number,
         category: String,
         projectId: Number,
-        jouryId: String
+        jouryId: String,
+        applicationId: String
     }],
     portfolio: [String],
     acceptedNominations: [String],
