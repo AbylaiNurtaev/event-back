@@ -30,6 +30,7 @@ import User from './models/User.js';
 import Journal from './models/Journal.js';
 import { fileURLToPath } from 'url';
 
+import axios from 'axios'
 const bucketName = process.env.BUCKET_NAME
 const bucketRegion = process.env.BUCKET_REGION
 const accesskey = process.env.ACCESS_KEY
@@ -479,25 +480,32 @@ app.get('/getAllUsers', async(req, res) => {
   }
 })
 
-app.get('/getAllUsersWithAvatars', async(req, res) => {
+app.get('/getAllUsersWithAvatars', async (req, res) => {
   try {
-    let users = await User.find()
+    let users = await User.find();
     const usersWithAvatars = await Promise.all(
       users.map(async (user) => {
-        // Предполагается, что путь к аватару хранится в user.avatarKey
         const avatarUrl = await getSignedUrlForKey(user.avatar);
 
+        const portfolioLength = Math.min(user.portfolio.length, 5);
+        const portfolio = await Promise.all(
+          user.portfolio.slice(0, portfolioLength).map((elem) => getSignedUrlForKey(elem))
+        );
+
         return {
-          ...user.toObject(), // Преобразуем mongoose объект в обычный объект
-          avatarUrl, // Добавляем ссылку на аватар
+          ...user.toObject(),
+          avatarUrl,
+          portfolio
         };
       })
     );
-    res.json(usersWithAvatars)
+    res.json(usersWithAvatars);
   } catch (error) {
-    console.log(error)
+    console.error(error);
+    res.status(500).send("Internal Server Error");
   }
-})
+});
+
 
 
 app.post('/getApplication', async (req, res) => {
@@ -1215,6 +1223,8 @@ app.post('/uploadImage', upload.single('image'), (req, res) => {
 
 // Раздача статических файлов (загруженные изображения)
 app.use('/uploads', express.static(uploadDir));
+
+
 
 
 
