@@ -1129,6 +1129,7 @@ app.post('/loginJoury', UserController.loginJoury)
 app.post('/setJouryNomination', UserController.setJouryNomination)
 
 app.post('/setJoury', UserController.setJoury)
+app.post('/setJouryStatus', UserController.setJouryStatus)
 
 
 app.post('/addCriterion', NominationController.addCriterion)

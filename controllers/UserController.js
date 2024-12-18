@@ -273,6 +273,29 @@ export const setJoury = async(req, res) => {
 }
 
 
+export const setJouryStatus = async(req, res) => {
+    try {
+        const email = req.body.email;
+        const status = req.body.status;
+        let user = await User.findOneAndUpdate(
+            {email},
+            {
+                additionalJoury: status
+            },
+            { new: true }
+        )
+        if(user){
+            res.json({ message: "Вы успешно выставили Жюри!" })
+        }else{
+            res.json({ message: "ПРоблемы с выставлением" })
+        }
+    } catch (error) {
+        res.status(404).json({
+            message: "Ошибка"
+        })
+    }
+}
+
 export const setJouryNomination = async(req, res) => {
     try {
         const email = req.body.email;

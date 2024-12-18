@@ -18,6 +18,10 @@ const UserSchema = new mongoose.Schema({
     about: String,
     instagram: String,
     youtube: String,
+    additionalJoury: {
+        type: Boolean,
+        default: false
+    },
     vk: String,
     tiktok: String,
     verified: Boolean,
