@@ -229,6 +229,26 @@ export const verifyOTP = async (req, res) => {
     }
 };
 
+export const updateJouryOrder = async (req, res) => {
+    try {
+        const { jouries } = req.body; // Получаем массив с жюри и их порядком
+
+        // Проходим по каждому жюри и обновляем его порядок
+        for (let i = 0; i < jouries.length; i++) {
+            await User.findOneAndUpdate(
+                { email: jouries[i].email }, // Поиск по email
+                { order: i }, // Устанавливаем новое значение order
+                { new: true } // Возвращаем обновлённый документ
+            );
+        }
+
+        res.status(200).json({ message: "Порядок жюри успешно обновлён!" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Ошибка при обновлении порядка жюри" });
+    }
+};
+
 
 
 export const getJouries = async (req, res) => {
@@ -396,6 +416,8 @@ export const getUserByToken = async (req, res) => {
         
     }
 }
+
+
 
 
 

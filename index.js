@@ -650,6 +650,8 @@ app.get('/getJouriesWithAvatars', async (req, res) => {
   }
 })
 
+app.post('/updateJouryOrder', UserController.updateJouryOrder)
+
 
 
 app.post('/auth/getAllInfoPerson', async (req, res) => {

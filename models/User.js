@@ -49,6 +49,7 @@ const UserSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    order: { type: Number, default: 0 } ,
     applications: [{
         type: mongoose.Schema.Types.Mixed,
         portfolio: [String],
