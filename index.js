@@ -583,6 +583,7 @@ app.post('/auth/getAllInfo', async (req, res) => {
       name: user.name,
       email: user.email,
       about: user.about,
+      liked: user.liked,
       avatar: user.avatar ? await getSignedUrlForKey(user.avatar) : null,
       logo: user.logo ? await getSignedUrlForKey(user.logo) : null
     };
@@ -1203,6 +1204,8 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+app.post('/favorites/addFavorite', UserController.addToFavorites)
+app.post('/favorites/removeFavorite', UserController.removeFromFavorites)
 
 app.post('/uploadImage', upload.single('image'), (req, res) => {
   try {

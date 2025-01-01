@@ -551,3 +551,63 @@ export const getJuryRatings = async (req, res) => {
         res.status(500).json({ message: "Failed to retrieve ratings", error });
     }
 };
+
+
+
+// Функция для добавления ссылки в избранное
+export const addToFavorites = async (req, res) => {
+    try {
+        const { userId, link } = req.body; // Получаем ID пользователя и ссылку из тела запроса
+
+        console.log(userId, link);
+        
+
+        if (!link) {
+            return res.status(400).json({ message: "Ссылка не предоставлена" });
+        }
+
+        // Находим пользователя и добавляем ссылку, если её нет в массиве liked
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $addToSet: { liked: link } }, // $addToSet предотвращает дублирование
+            { new: true } // Возвращаем обновлённый документ
+        );
+        console.log(user);
+        
+        if (!user) {
+            return res.status(404).json({ message: "Пользователь не найден" });
+        }
+
+        res.status(200).json({ message: "Ссылка добавлена в избранное", liked: user.liked });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Ошибка при добавлении в избранное" });
+    }
+};
+
+// Функция для удаления ссылки из избранного
+export const removeFromFavorites = async (req, res) => {
+    try {
+        const { userId, link } = req.body; // Получаем ID пользователя и ссылку из тела запроса
+
+        if (!link) {
+            return res.status(400).json({ message: "Ссылка не предоставлена" });
+        }
+
+        // Находим пользователя и удаляем ссылку из массива liked
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $pull: { liked: link } }, // $pull удаляет элемент из массива
+            { new: true } // Возвращаем обновлённый документ
+        );
+
+        if (!user) {
+            return res.status(404).json({ message: "Пользователь не найден" });
+        }
+
+        res.status(200).json({ message: "Ссылка удалена из избранного", liked: user.liked });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Ошибка при удалении из избранного" });
+    }
+};
