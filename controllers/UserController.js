@@ -611,3 +611,30 @@ export const removeFromFavorites = async (req, res) => {
         res.status(500).json({ message: "Ошибка при удалении из избранного" });
     }
 };
+
+
+export const updateUserBalance = async (req, res) => {
+    try {
+        const { userId, balance } = req.body; // Получаем ID пользователя и новый баланс из тела запроса
+
+        if (typeof balance !== "number") {
+            return res.status(400).json({ message: "Баланс должен быть числом" });
+        }
+
+        // Находим пользователя и обновляем баланс
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $set: { balance } }, // $set устанавливает новое значение для поля
+            { new: true } // Возвращаем обновлённый документ
+        );
+
+        if (!user) {
+            return res.status(404).json({ message: "Пользователь не найден" });
+        }
+
+        res.status(200).json({ message: "Баланс успешно обновлён", balance: user.balance });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Ошибка при обновлении баланса" });
+    }
+};

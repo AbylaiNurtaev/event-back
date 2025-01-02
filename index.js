@@ -1227,6 +1227,8 @@ app.post('/uploadImage', upload.single('image'), (req, res) => {
 });
 
 
+app.post('/updateBalance', UserController.updateUserBalance)
+
 // Раздача статических файлов (загруженные изображения)
 app.use('/uploads', express.static(uploadDir));
 
