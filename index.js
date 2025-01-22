@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs'
 dotenv.config();
 import crypto from 'crypto'
+import nodemailer from 'nodemailer'
 
 import sharp from 'sharp';
 
@@ -53,7 +54,31 @@ const errorMsg = chalk.bgWhite.redBright;
 const successMsg = chalk.bgGreen.white;
 
 const randomImageName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex')
+const auth = {
+  user: process.env.USER1,
+  pass: process.env.PASS
+}
 
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  port: 587,
+
+  auth: {
+    user: auth.user,
+    pass: auth.pass,
+  },
+  secure: false, // Используем безопасное соединение
+});
+
+const verifyTransporter = async () => {
+  try {
+    await transporter.verify();
+    console.log('SMTP сервер готов для отправки сообщений');
+  } catch (error) {
+    console.error('Ошибка при проверке соединения SMTP:', error);
+    throw error;
+  }
+};
 
 // mongoose.connect(process.env.MONGODB_URI)
 mongoose.connect('mongodb+srv://wedsastana:20060903@cluster0.h2di1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
@@ -428,6 +453,21 @@ app.post('/createApplication', async (req, res) => {
       user.balance -= 1; // Вычитаем 1 балл
       await user.save();  // Сохраняем изменения в базе данных
 
+      try {
+          const mailOptions = {
+              from: auth.user,
+              to: user.email,
+              subject: "WEDS RATING🔥",
+              html: `<img src="https://i.imgur.com/qJax1GC.png" alt="Verification Code Image" style="width: 100%; max-width: 600px;">
+              <p><b style="font-size: 18px;">Поздравляем! Вы успешно подали заявку в WEDS RATING🔥</b></p>
+              `
+          }
+          await verifyTransporter()
+          await transporter.sendMail(mailOptions);
+      } catch (error) {
+          console.log(error)
+      }
+      
       res.json({ user, message: "Заявка успешно добавлена, баланс уменьшен" });
     }
     else if(user && !isNew){
