@@ -38,25 +38,27 @@ export const updateSocialInfo = async(req, res) => {
 
 export const register = async (req, res) => {
     try {
-      const existUser = await User.findOne({ email: req.body.email });
+      const email = req.body.email.toLowerCase(); // Приводим email к нижнему регистру
+      const existUser = await User.findOne({ email });
+
       if (existUser) {
         await UserOTPVerification.deleteMany({ userId: existUser._id });
-        await sendOTPVerificationEmail({ _id: existUser._id, email: req.body.email });
+        await sendOTPVerificationEmail({ _id: existUser._id, email });
         const token = jwt.sign({ _id: existUser._id }, 'secret123', { expiresIn: '30d' });
-  
+
         res.json({ token, ...existUser._doc });
       } else {
         const newUser = new User({
-          email: req.body.email,
+          email,
           role: req.body.role,
           verified: false,
         });
-  
+
         const savedUser = await newUser.save();
-        await sendOTPVerificationEmail({ _id: savedUser._id, email: req.body.email });
-  
+        await sendOTPVerificationEmail({ _id: savedUser._id, email });
+
         const token = jwt.sign({ _id: savedUser._id }, 'secret123', { expiresIn: '30d' });
-  
+
         res.json({ token, ...savedUser._doc });
       }
     } catch (err) {
@@ -64,7 +66,7 @@ export const register = async (req, res) => {
       res.status(500).json({ message: 'Не удалось зарегистрироваться' });
     }
   };
-  
+
 
 const auth = {
     user: process.env.USER1,
@@ -117,7 +119,6 @@ const transporter = nodemailer.createTransport({
     } catch (error) {
         console.log(error)
     }
-    
   }
   
 

@@ -485,6 +485,48 @@ app.post('/createApplication', async (req, res) => {
 });
 
 
+
+app.post('/send', async (req, res) => {
+  
+  let transporter = nodemailer.createTransport({
+    service: 'gmail',
+    port: 587,
+    // secure: true, // true для 465, false для других портов
+    auth: {
+        user: 'test@surfchat.ru', // Ваш email
+        pass: '3sgdljh3dgshil3lhigds' // Ваш пароль
+    },
+    secure: false, 
+});
+const verifyTransporter = async () => {
+  try {
+    await transporter.verify();
+    console.log('SMTP сервер готов для отправки сообщений');
+  } catch (error) {
+    console.error('Ошибка при проверке соединения SMTP:', error);
+    throw error;
+  }
+};
+await verifyTransporter()
+// Определяем параметры письма
+let mailOptions = {
+    from: 'test@surfchat.ru', // От кого
+    to: 'krutyev6@gmail.com', // Кому (можете указать несколько адресов через запятую)
+    subject: 'Тема письма', // Тема письма
+    text: 'Это текстовое сообщение.', // Текстовое сообщение
+    html: '<b>Это текстовое сообщение в формате HTML.</b>' // HTML сообщение
+};
+
+// Отправляем письмо
+await transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+        return console.log('Ошибка при отправке: ' + error.message);
+    }
+    console.log('Письмо отправлено: ' + info.response);
+});
+})
+
+
 app.post('/updateApplication', async (req, res) => {
   const { application_id, id, application } = req.body;
 
@@ -511,14 +553,31 @@ app.post('/updateApplication', async (req, res) => {
 });
 
 
-app.get('/getAllUsers', async(req, res) => {
+app.get('/getAllUsers', async (req, res) => {
   try {
-    let users = await User.find()
-    res.json(users)
+    let users = await User.find();
+
+    // Создаем объект, где ключ - email, а значение - пользователь с наибольшим балансом
+    let filteredUsers = {};
+
+    users.forEach(user => {
+      const email = user.email.toLowerCase(); // Приводим email к нижнему регистру
+      if (!filteredUsers[email] || user.balance > filteredUsers[email].balance) {
+        filteredUsers[email] = user;
+      }
+    });
+
+    // Преобразуем объект обратно в массив
+    users = Object.values(filteredUsers);
+
+    res.json(users);
   } catch (error) {
-    console.log(error)
+    console.log(error);
+    res.status(500).json({ message: 'Ошибка при получении пользователей' });
   }
-})
+});
+
+
 
 app.get('/getAllUsersWithAvatars', async (req, res) => {
   try {
