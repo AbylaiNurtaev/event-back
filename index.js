@@ -88,11 +88,13 @@ mongoose.connect('mongodb+srv://wedsastana:20060903@cluster0.h2di1.mongodb.net/?
 
 const app = express();
 
-app.use(cors({
-  origin: 'https://weds.kz', // Укажите домен вашего фронтенда
-  methods: ['GET','PATCH', 'POST', 'PUT', 'DELETE'],
-  credentials: true, // Если нужны куки или авторизация
-}));
+// app.use(cors({
+//   origin: 'https://weds.kz', // Укажите домен вашего фронтенда
+//   methods: ['GET','PATCH', 'POST', 'PUT', 'DELETE'],
+//   credentials: true, // Если нужны куки или авторизация
+// }));
+app.use(cors());
+
 
 
 app.use(express.json());
