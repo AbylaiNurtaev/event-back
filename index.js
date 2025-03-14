@@ -101,57 +101,99 @@ const storage = multer.memoryStorage()
 const upload = multer({ storage: storage })
 
 
-app.post('/api/uploadPortfolio/:id', upload.array('images', 50), async (req, res) => {
+const generateFileHash = () => crypto.randomBytes(32).toString("hex");
+
+// Функция извлечения хэша из URL
+const extractHashFromUrl = (url) => {
+    const parts = url.split("/");
+    return parts[parts.length - 1].split("?")[0]; // Убираем параметры запроса (если есть)
+};
+
+
+app.post('/api/uploadPortfolio/:id', upload.array('newImages', 50), async (req, res) => {
   try {
-    const id = req.params.id;
-    const application_id = req.body.application_id;
+    const { id } = req.params;
+    const { application_id, orderedPortfolio, newFileIndexes } = req.body;
+    const newFiles = req.files || [];
 
-    // Flatten the array of arrays into a single array
-    const files = req.files.flat();
-    const uploadedImages = [];
+    console.log(`Загружено файлов: ${newFiles.length}`);
+    console.log(`OrderedPortfolio: ${orderedPortfolio}`);
 
-    for (let file of files) {
-      const buffer = await sharp(file.buffer).toBuffer(); // Process the image using sharp
-      const imageName = randomImageName(); // Generate a unique name for the image
+    let orderedPortfolioArray = JSON.parse(orderedPortfolio); // Восстанавливаем структуру
+    let newFileIndexesArray = JSON.parse(newFileIndexes); // Индексы новых файлов
+
+    let uploadedHashes = [];
+
+    // Загружаем новые файлы в S3
+    for (const file of newFiles) {
+      const buffer = await sharp(file.buffer).toBuffer();
+      const fileHash = generateFileHash(); // Генерируем уникальный хэш
 
       const params = {
         Bucket: bucketName,
-        Key: imageName,
+        Key: fileHash,
         Body: buffer,
-        ContentType: file.mimetype
+        ContentType: file.mimetype,
       };
 
       const command = new PutObjectCommand(params);
       await s3.send(command);
 
-      uploadedImages.push(imageName); // Add the image name to the array of uploaded images
+      uploadedHashes.push(fileHash);
     }
 
-    // Update the existing application data by pushing new images into the portfolio array
-    let user = await User.findOneAndUpdate(
+    // Заменяем "NEW_FILE" на загруженные хэши в `orderedPortfolioArray`
+    newFileIndexesArray.forEach(({ groupIndex, fileIndex }, index) => {
+        orderedPortfolioArray[groupIndex][fileIndex] = uploadedHashes[index];
+    });
+
+    // Обрабатываем `orderedPortfolioArray`: заменяем ссылки на хэши
+    orderedPortfolioArray = orderedPortfolioArray.map((group) =>
+      group.map((item) => (typeof item === "string" ? extractHashFromUrl(item) : item))
+    );
+
+    // 1. Проверяем, существует ли пользователь
+    let user = await User.findOne({ _id: id });
+
+    if (!user) {
+      return res.status(404).json({ message: "Пользователь не найден" });
+    }
+
+    // 2. Обновляем или создаём заявку
+    const updatedUser = await User.findOneAndUpdate(
       { _id: id, "applications.application_id": application_id },
-      { $push: { "applications.$.portfolio": { $each: uploadedImages } } }, // Use $push with $each to add multiple images
+      {
+        $set: { "applications.$.portfolio": orderedPortfolioArray }
+      },
       { new: true }
     );
 
-    if (!user) {
-      // If the application with such application_id does not exist, create a new one
-      user = await User.findOneAndUpdate(
+    // 3. Если заявки не было – создаём новую
+    if (!updatedUser) {
+      await User.findOneAndUpdate(
         { _id: id },
-        { $push: { applications: { application_id: application_id, portfolio: uploadedImages } } }, // Push a new application object
+        {
+          $push: {
+            applications: {
+              application_id: application_id,
+              portfolio: orderedPortfolioArray
+            }
+          }
+        },
         { new: true }
       );
     }
 
-    res.json({ message: 'Фотографии успешно загружены', images: uploadedImages });
+    res.json({
+      message: "Файлы успешно загружены",
+      portfolio: orderedPortfolioArray,
+    });
+
   } catch (error) {
-    console.error('Ошибка загрузки фотографий:', error);
-    res.status(500).json({ message: 'Ошибка загрузки фотографий' });
+    console.error("Ошибка загрузки фотографий:", error);
+    res.status(500).json({ message: "Ошибка загрузки фотографий" });
   }
 });
-
-
-
 
 
 
@@ -259,58 +301,59 @@ app.delete('/api/deleteDocument/:id/:application_id/:index', async (req, res) =>
   }
 });
 
-
-app.delete('/api/deletePortfolio/:id/:application_id/:index', async (req, res) => {
+app.delete('/api/deletePortfolio/:id/:application_id/:sectionIndex/:fileIndex', async (req, res) => {
   try {
-    const { id, application_id, index } = req.params;
-    console.log(id, application_id, index)
+    const { id, application_id, sectionIndex, fileIndex } = req.params;
+    console.log("Удаление файла:", id, application_id, sectionIndex, fileIndex);
 
-    // Находим пользователя с заявкой
     let user = await User.findOne({ _id: id, "applications.application_id": application_id });
 
     if (!user) {
-      return res.status(404).json({ message: 'Пользователь или заявка не найдены' });
+      return res.status(404).json({ message: "Пользователь или заявка не найдены" });
     }
 
-    // Находим нужную заявку
     const application = user.applications.find(app => app.application_id === application_id);
 
     if (!application) {
-      return res.status(404).json({ message: 'Заявка не найдена' });
+      return res.status(404).json({ message: "Заявка не найдена" });
     }
 
-    // Проверяем, что индекс элемента в портфолио существует
-    if (index < 0 || index >= application.portfolio.length) {
-      return res.status(400).json({ message: 'Неверный индекс элемента портфолио' });
+    if (!application.portfolio[sectionIndex] || !application.portfolio[sectionIndex][fileIndex]) {
+      return res.status(400).json({ message: "Неверный индекс элемента портфолио" });
     }
 
-    const portfolioItem = application.portfolio[index];
+    const portfolioItem = application.portfolio[sectionIndex][fileIndex];
 
-    // Удаляем элемент портфолио (если нужно удалить из S3)
+    // Удаляем изображение из S3 (если хранится в облаке)
     const deleteParams = {
       Bucket: bucketName,
-      Key: portfolioItem, // Здесь предполагается, что в `portfolioItem` содержится имя файла
+      Key: portfolioItem,
     };
-
     const command = new DeleteObjectCommand(deleteParams);
     await s3.send(command);
 
-    // Удаляем элемент из массива портфолио
-    application.portfolio.splice(index, 1);
+    // Удаляем элемент из массива в нужной секции
+    application.portfolio[sectionIndex].splice(fileIndex, 1);
 
-    // Сохраняем обновлённый массив портфолио в базе данных
+    // Обновляем данные в базе
     await User.findOneAndUpdate(
       { _id: id, "applications.application_id": application_id },
-      { $set: { "applications.$.portfolio": application.portfolio } }, // Обновляем портфолио в нужной заявке
+      { $set: { "applications.$.portfolio": application.portfolio } },
       { new: true }
     );
 
-    res.json({ message: 'Элемент портфолио успешно удалён', portfolio: application.portfolio });
+    res.json({
+      message: "Элемент портфолио успешно удалён",
+      portfolio: application.portfolio,
+    });
+
   } catch (error) {
-    console.error('Ошибка удаления элемента портфолио:', error);
-    res.status(500).json({ message: 'Ошибка удаления элемента портфолио' });
+    console.error("Ошибка удаления элемента портфолио:", error);
+    res.status(500).json({ message: "Ошибка удаления элемента портфолио" });
   }
 });
+
+
 
 
 
@@ -651,12 +694,17 @@ app.post('/auth/getAllInfo', async (req, res) => {
     const allInfo = {};
     // Конвертируем portfolio
     if (application.portfolio && application.portfolio.length > 0) {
-      const portfolioUrls = await Promise.all(application.portfolio.map(async (key) => {
-        const url = await getSignedUrlForKey(key);
-        return url;
-      }));
+      const portfolioUrls = await Promise.all(
+        application.portfolio.map(async (group) => {
+          if (!Array.isArray(group)) return []; // Если по ошибке не массив, пропускаем
+          const urls = await Promise.all(group.map(async (key) => await getSignedUrlForKey(key)));
+          return urls;
+        })
+      );
+    
       allInfo.portfolio = portfolioUrls;
     }
+    
 
     // Конвертируем previews
     if (application.previews && application.previews.length > 0) {

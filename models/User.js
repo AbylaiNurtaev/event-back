@@ -52,7 +52,8 @@ const UserSchema = new mongoose.Schema({
     order: { type: Number, default: 0 } ,
     applications: [{
         type: mongoose.Schema.Types.Mixed,
-        portfolio: [String],
+        portfolio: [[String]],
+        
         previews: [String],
         accepted: {
             type: String,
