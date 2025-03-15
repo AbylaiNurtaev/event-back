@@ -472,8 +472,22 @@ export const accessApplication = async (req, res) => {
                 // Mark the `applications` array as modified to ensure Mongoose saves it
                 user.markModified("applications");
 
+
                 // Save the user document to persist changes
                 await user.save();
+                const auth = {
+                    user: process.env.USER1,
+                    pass: process.env.PASS
+                }
+                const mailOptions = {
+                    from: auth.user,
+                    // to: 'wolfaleks84@gmail.com',
+                    to: user.email,
+                    subject: "WEDS",
+                    html: `Ваша заявка на участие в номинации ${application?.application_data?.nomination} имеет статус: Одобрена, для просмотра заявки перейдите в личный кабинет.`
+                }
+                await verifyTransporter()
+                await transporter.sendMail(mailOptions);
 
                 res.json({ message: "Application status updated", application });
             } else {

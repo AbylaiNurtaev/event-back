@@ -627,14 +627,20 @@ app.get('/getAllUsers', async (req, res) => {
 app.get('/getAllUsersWithAvatars', async (req, res) => {
   try {
     let users = await User.find();
+    
     const usersWithAvatars = await Promise.all(
       users.map(async (user) => {
         const avatarUrl = await getSignedUrlForKey(user.avatar);
 
-        const portfolioLength = Math.min(user.portfolio.length, 5);
+        // Извлекаем портфолио из всех заявок пользователя
+        const allPortfolios = user?.applications?.flatMap(app => app?.portfolio?.[0] || []) || [];
+
+        // Берем не более 5 элементов
+        const portfolioLength = Math.min(allPortfolios.length, 5);
         const portfolio = await Promise.all(
-          user.portfolio.slice(0, portfolioLength).map((elem) => getSignedUrlForKey(elem))
+          allPortfolios.slice(0, portfolioLength).map((elem) => getSignedUrlForKey(elem))
         );
+        user.portfolio = portfolio
 
         return {
           ...user.toObject(),
@@ -643,6 +649,7 @@ app.get('/getAllUsersWithAvatars', async (req, res) => {
         };
       })
     );
+
     res.json(usersWithAvatars);
   } catch (error) {
     console.error(error);
