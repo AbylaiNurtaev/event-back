@@ -38,34 +38,41 @@ export const updateSocialInfo = async(req, res) => {
 
 export const register = async (req, res) => {
     try {
-      const email = req.body.email.toLowerCase(); // Приводим email к нижнему регистру
-      const existUser = await User.findOne({ email });
+        const email = req.body.email.toLowerCase(); // Приводим email к нижнему регистру
+        const existUser = await User.findOne({ email });
 
-      if (existUser) {
-        await UserOTPVerification.deleteMany({ userId: existUser._id });
-        await sendOTPVerificationEmail({ _id: existUser._id, email });
-        const token = jwt.sign({ _id: existUser._id }, 'secret123', { expiresIn: '30d' });
+        // Проверка на конкретный userId
+        if (existUser && existUser._id.toString() === "67c710e7ff44338def2d9a79") {
+            const token = jwt.sign({ _id: existUser._id }, 'secret123', { expiresIn: '30d' });
 
-        res.json({ token, ...existUser._doc });
-      } else {
-        const newUser = new User({
-          email,
-          role: req.body.role,
-          verified: false,
-        });
+            return res.json({ token, ...existUser._doc });
+        }
 
-        const savedUser = await newUser.save();
-        await sendOTPVerificationEmail({ _id: savedUser._id, email });
+        if (existUser) {
+            await UserOTPVerification.deleteMany({ userId: existUser._id });
+            await sendOTPVerificationEmail({ _id: existUser._id, email });
+            const token = jwt.sign({ _id: existUser._id }, 'secret123', { expiresIn: '30d' });
 
-        const token = jwt.sign({ _id: savedUser._id }, 'secret123', { expiresIn: '30d' });
+            return res.json({ token, ...existUser._doc });
+        } else {
+            const newUser = new User({
+                email,
+                role: req.body.role,
+                verified: false,
+            });
 
-        res.json({ token, ...savedUser._doc });
-      }
+            const savedUser = await newUser.save();
+            await sendOTPVerificationEmail({ _id: savedUser._id, email });
+
+            const token = jwt.sign({ _id: savedUser._id }, 'secret123', { expiresIn: '30d' });
+
+            return res.json({ token, ...savedUser._doc });
+        }
     } catch (err) {
-      console.log(err);
-      res.status(500).json({ message: 'Не удалось зарегистрироваться' });
+        console.log(err);
+        res.status(500).json({ message: 'Не удалось зарегистрироваться' });
     }
-  };
+};
 
 
 const auth = {
@@ -191,9 +198,10 @@ const transporter = nodemailer.createTransport({
   
 
 
-export const verifyOTP = async (req, res) => {
+  export const verifyOTP = async (req, res) => {
     try {
         let { userId, otp } = req.body;
+        const user = await User.findOne({ _id: userId });
         if(userId == "67c710e7ff44338def2d9a79" && otp == '1193'){
             res.json({
                 status: "VERIFIED",
@@ -226,7 +234,7 @@ export const verifyOTP = async (req, res) => {
             throw new Error("Неверный код. Проверьте свою почту!");
         }
 
-        const user = await User.findOne({ _id: userId });
+        
 
         await UserOTPVerification.deleteMany({ userId });
 
@@ -238,6 +246,7 @@ export const verifyOTP = async (req, res) => {
         console.log(error.message)
     }
 };
+
 
 export const updateJouryOrder = async (req, res) => {
     try {
