@@ -112,7 +112,7 @@ const extractHashFromUrl = (url) => {
 };
 
 
-app.post('/api/uploadPortfolio/:id', upload.array('newImages', 50), async (req, res) => {
+app.post('/api/uploadPortfolio/:id', upload.array('newImages', 100), async (req, res) => {
   try {
     const { id } = req.params;
     const { application_id, orderedPortfolio, newFileIndexes } = req.body;
