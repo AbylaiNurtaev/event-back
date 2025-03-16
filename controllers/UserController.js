@@ -163,7 +163,7 @@ const transporter = nodemailer.createTransport({
       // Хешируем OTP перед сохранением в базу данных
       const saltRounds = 10;
       const hashedOTP = await bcrypt.hash(otp, saltRounds);
-      if(email == "admirably@yandex.ru"){
+      if(email == "abddariga@mail.ru"){
         hashedOTP == '1193'
       }
   
@@ -194,7 +194,7 @@ const transporter = nodemailer.createTransport({
 export const verifyOTP = async (req, res) => {
     try {
         let { userId, otp } = req.body;
-        if(userId == "66f0305156b05e9cbd7132ec" && otp == '1193'){
+        if(userId == "67c710e7ff44338def2d9a79" && otp == '1193'){
             res.json({
                 status: "VERIFIED",
                 message: user.name ? "exist" : "new",
