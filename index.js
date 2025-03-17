@@ -751,6 +751,7 @@ app.post('/auth/getAllInfo', async (req, res) => {
     res.json({
       ...allInfo,
       application_data: application.application_data, // Включаем данные заявки
+      accepted: application?.accepted ? true : false,
       token,
     });
 
