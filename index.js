@@ -365,7 +365,9 @@ app.delete('/api/deletePortfolio/:id/:application_id/:sectionIndex/:fileIndex', 
 app.post('/api/uploadPreview/:id', upload.array('images', 10), async (req, res) => {
   try {
     const id = req.params.id;
-    const application_id = req.body.application_id
+    const userId = req.params.id;
+    // const application_id = req.body.application_id
+    const { application_id, index } = req.body;
 
     
     const files = req.files; // Получаем массив файлов
@@ -389,19 +391,66 @@ app.post('/api/uploadPreview/:id', upload.array('images', 10), async (req, res) 
     }
 
     
-    let user = await User.findOneAndUpdate(
-      { _id: id, "applications.application_id": application_id },
-      { $push: { "applications.$.previews": { $each: uploadedImages } } }, // Обновление, если есть такой application_id
-      { new: true }
-    );
-    
-    if (!user) {
-      // Если заявки с таким application_id нет, создаём новую заявку
-      user = await User.findOneAndUpdate(
-        { _id: id },
-        { $push: { applications: { application_id: application_id, previews: uploadedImages } } }, // Пушим новый объект заявки
+    if (index !== undefined) {
+      // Можно учесть, что index придёт в виде строки, перевести в число:
+      const idx = parseInt(index, 10);
+
+      // Предположим, мы сейчас загружаем ровно один файл (или вы сами решаете логику)
+      const newImageName = uploadedImages[0];
+
+      const user = await User.findOneAndUpdate(
+        { _id: userId, "applications.application_id": application_id },
+        {
+          $set: {
+            // Важно собрать ключ динамически: "applications.$.previews.idx"
+            [`applications.$.previews.${idx}`]: newImageName,
+          },
+        },
         { new: true }
       );
+
+      return res.json({
+        message: "Превью заменено",
+        user,
+        newImage: newImageName,
+      });
+    } else {
+      // 3) Иначе — если index не передали, значит мы добавляем файлы в конец массива
+      const user = await User.findOneAndUpdate(
+        { _id: userId, "applications.application_id": application_id },
+        {
+          $push: { "applications.$.previews": { $each: uploadedImages } },
+        },
+        { new: true }
+      );
+
+      // Если не нашли заявку (applications с таким application_id), 
+      // то создаём новую (как у вас было в исходном коде).
+      if (!user) {
+        const user2 = await User.findOneAndUpdate(
+          { _id: userId },
+          {
+            $push: {
+              applications: {
+                application_id,
+                previews: uploadedImages,
+              },
+            },
+          },
+          { new: true }
+        );
+        return res.json({
+          message: "Новая заявка создана и фото добавлены",
+          user: user2,
+          images: uploadedImages,
+        });
+      }
+
+      return res.json({
+        message: "Новые превью добавлены",
+        user,
+        images: uploadedImages,
+      });
     }
 
     res.json({ message: 'Фотографии успешно загружены', images: uploadedImages, user: user });
