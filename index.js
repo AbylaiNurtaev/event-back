@@ -162,7 +162,9 @@ app.post('/api/uploadPortfolio/:id', upload.array('newImages', 1000), async (req
     // orderedPortfolioArray = orderedPortfolioArray.map(group => Array.isArray(group) ? group : []);
     orderedPortfolioArray = orderedPortfolioArray.map(group => (group.length > 0 ? group : []));
 
-
+    orderedPortfolioArray = orderedPortfolioArray.map((group) =>
+      group.map((item) => (typeof item === "string" ? extractHashFromUrl(item) : item))
+    );
 
 
     console.log("Финальный `orderedPortfolioArray` перед обновлением:", orderedPortfolioArray);
