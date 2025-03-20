@@ -391,7 +391,7 @@ app.post('/api/uploadPreview/:id', upload.array('images', 10), async (req, res) 
     const uploadedImages = [];
 
     for (let file of files) {
-      const buffer = await sharp(file.buffer).toBuffer(); // Обрабатываем изображение через sharp
+      const buffer = await sharp(file.buffer).rotate().toBuffer(); // Обрабатываем изображение через sharp
       const imageName = randomImageName(); // Генерируем имя для изображения
 
       const params = {
