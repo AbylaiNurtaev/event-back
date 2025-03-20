@@ -113,6 +113,7 @@ const extractHashFromUrl = (url) => {
 
 
 app.post('/api/uploadPortfolio/:id', upload.array('newImages', 1000), async (req, res) => {
+
   try {
     const { id } = req.params;
     const { application_id, orderedPortfolio, newFileIndexes } = req.body;
@@ -123,6 +124,7 @@ app.post('/api/uploadPortfolio/:id', upload.array('newImages', 1000), async (req
 
     let orderedPortfolioArray = JSON.parse(orderedPortfolio); // Восстанавливаем структуру
     let newFileIndexesArray = JSON.parse(newFileIndexes); // Индексы новых файлов
+    console.log("ФУНК1", orderedPortfolioArray)
 
     let uploadedHashes = [];
 
@@ -143,24 +145,25 @@ app.post('/api/uploadPortfolio/:id', upload.array('newImages', 1000), async (req
 
       uploadedHashes.push(fileHash);
     }
+
+    console.log("ФУНК2", orderedPortfolioArray)
     newFileIndexesArray.forEach(({ groupIndex, fileIndex }, index) => {
       if (!orderedPortfolioArray[groupIndex]) {
-          console.warn(`Предупреждение: Группа ${groupIndex} отсутствует, создаём новую`);
-          orderedPortfolioArray[groupIndex] = [];
-      }
-  
-      orderedPortfolioArray[groupIndex][fileIndex] = uploadedHashes[index];
+        orderedPortfolioArray[groupIndex] = [];
+    }
+    orderedPortfolioArray[groupIndex][fileIndex] = uploadedHashes[index] || null;
+    
   });
   
   
-  
+  console.log("ФУНК3", orderedPortfolioArray)
 
     // Обрабатываем `orderedPortfolioArray`: заменяем ссылки на хэши
-    orderedPortfolioArray = orderedPortfolioArray
-    .map((group) =>
-        group.map((item) => (typeof item === "string" ? extractHashFromUrl(item) : item))
-    )
-    .filter((group) => group.length > 0); // Удаляем пустые массивы
+    // orderedPortfolioArray = orderedPortfolioArray.map(group => Array.isArray(group) ? group : []);
+    orderedPortfolioArray = orderedPortfolioArray.map(group => (group.length > 0 ? group : []));
+
+
+
 
     console.log("Финальный `orderedPortfolioArray` перед обновлением:", orderedPortfolioArray);
 
@@ -197,6 +200,7 @@ app.post('/api/uploadPortfolio/:id', upload.array('newImages', 1000), async (req
       );
     }
 
+    console.log('orderedPortfolioArray', orderedPortfolioArray)
     res.json({
       message: "Файлы успешно загружены",
       portfolio: orderedPortfolioArray,
