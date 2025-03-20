@@ -143,16 +143,27 @@ app.post('/api/uploadPortfolio/:id', upload.array('newImages', 1000), async (req
 
       uploadedHashes.push(fileHash);
     }
-
-    // Заменяем "NEW_FILE" на загруженные хэши в `orderedPortfolioArray`
     newFileIndexesArray.forEach(({ groupIndex, fileIndex }, index) => {
-        orderedPortfolioArray[groupIndex][fileIndex] = uploadedHashes[index];
-    });
+      if (!orderedPortfolioArray[groupIndex]) {
+          console.warn(`Предупреждение: Группа ${groupIndex} отсутствует, создаём новую`);
+          orderedPortfolioArray[groupIndex] = [];
+      }
+  
+      orderedPortfolioArray[groupIndex][fileIndex] = uploadedHashes[index];
+  });
+  
+  
+  
 
     // Обрабатываем `orderedPortfolioArray`: заменяем ссылки на хэши
-    orderedPortfolioArray = orderedPortfolioArray.map((group) =>
-      group.map((item) => (typeof item === "string" ? extractHashFromUrl(item) : item))
-    );
+    orderedPortfolioArray = orderedPortfolioArray
+    .map((group) =>
+        group.map((item) => (typeof item === "string" ? extractHashFromUrl(item) : item))
+    )
+    .filter((group) => group.length > 0); // Удаляем пустые массивы
+
+    console.log("Финальный `orderedPortfolioArray` перед обновлением:", orderedPortfolioArray);
+
 
     // 1. Проверяем, существует ли пользователь
     let user = await User.findOne({ _id: id });
@@ -755,7 +766,11 @@ app.post('/auth/getAllInfo', async (req, res) => {
       const portfolioUrls = await Promise.all(
         application.portfolio.map(async (group) => {
           if (!Array.isArray(group)) return []; // Если по ошибке не массив, пропускаем
-          const urls = await Promise.all(group.map(async (key) => await getSignedUrlForKey(key)));
+          const urls = await Promise.all(
+            group
+              .filter((key) => key != "NEW_FILE")
+              .map(async (key) => await getSignedUrlForKey(key))
+          );
           return urls;
         })
       );
