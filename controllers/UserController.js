@@ -250,20 +250,27 @@ const transporter = nodemailer.createTransport({
 
 export const updateJouryOrder = async (req, res) => {
     try {
-        const { jouries } = req.body; // Получаем массив с жюри и их порядком
+        const { jouries } = req.body;
 
-        // Проходим по каждому жюри и обновляем его порядок
+        // Обновляем все данные для каждого жюри
         for (let i = 0; i < jouries.length; i++) {
+            const joury = jouries[i];
             await User.findOneAndUpdate(
-                { email: jouries[i].email }, // Поиск по email
-                { order: i }, // Устанавливаем новое значение order
-                { new: true } // Возвращаем обновлённый документ
+                { email: joury.email },
+                { 
+                    order: i,
+                    name: joury.name,
+                    acceptedNominations: joury.acceptedNominations,
+                    jouryCounter: joury.jouryCounter,
+                    additionalJoury: joury.additionalJoury
+                },
+                { new: true }
             );
         }
 
         res.status(200).json({ message: "Порядок жюри успешно обновлён!" });
     } catch (error) {
-        console.error(error);
+        console.error("Ошибка при обновлении порядка жюри:", error);
         res.status(500).json({ message: "Ошибка при обновлении порядка жюри" });
     }
 };
